@@ -1,0 +1,80 @@
+.server-info p {
+    font-size: 14px;
+    color: #000;
+}
+
+.dashboard_inf_table {
+    width: 100%;
+    margin: 0;
+    float: none;
+}
+
+.infohouse_settings_page {
+    padding: 0 0 40px;
+    height: auto;
+    overflow: auto;
+}
+
+@media (min-width: 768px) {
+    .infohouse_settings_page {
+        padding-left: 0;
+        padding-right: 0;
+    }
+}
+
+.infohouse_settings_page .table-responsive {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 30px;
+}
+
+.infohouse_settings_page .table-responsive .infohouse_table {
+    flex: 1;
+    max-width: 100%;
+}
+
+.infohouse_heading {
+    font-size: 28px !important;
+}
+
+.infohouse_table {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-collapse: collapse;
+    background-color: #fff;
+}
+
+.infohouse_table tr th {
+    margin: 0;
+    border: 1px solid rgb(0, 115, 170);
+    text-align: center;
+    background: #0073aa;
+}
+
+.infohouse_table tr th h3 {
+    color: #fff;
+}
+
+.infohouse_table tr td {
+    margin: 0;
+    padding: 16px 20px;
+    border: 1px solid rgba(195, 195, 195, 0.08);
+}
+
+.infohouse_table tr td li span {
+    font-size: 11px;
+}
+
+.infohouse_table tr td p {
+    padding: 0;
+    margin: 0;
+    font-weight: 400;
+    font-size: 12px;
+}
+
+.infohouse_table tr td.view-more-info {
+    padding: 15px 0 1px 0;
+    text-align: center;
+    background: #fff;
+}
