@@ -1,9 +1,10 @@
 === Server Info ===
 Contributors: usmanaliqureshi
-Tags: admin, dashboard, widget, server, info, PHP, version, operating system, wordpress, database
-Requires at least: 3.0
-Tested up to: 6.2
-Stable tag: 5.2
+Tags: admin, dashboard, server info, widget, server status
+Requires at least: 4.9
+Tested up to: 6.8
+Stable tag: 0.0.1
+Requires PHP: 7.3
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
