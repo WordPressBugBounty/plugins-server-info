@@ -1,249 +1,998 @@
-#, fuzzy
+# Copyright (C) 2026 Usman Ali Qureshi
+# This file is distributed under the GPLv2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Server Info\n"
-"POT-Creation-Date: 2023-06-01 18:13+0500\n"
-"PO-Revision-Date: 2023-06-01 18:13+0500\n"
-"Last-Translator: \n"
-"Language-Team: \n"
+"Project-Id-Version: Server Info - System Health & Diagnostics Suite 1.1.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/trunk\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
-"X-Generator: Poedit 3.3.1\n"
-"X-Poedit-Basepath: ..\n"
-"X-Poedit-Flags-xgettext: --add-comments=translators:\n"
-"X-Poedit-WPHeader: server-info.php\n"
-"X-Poedit-SourceCharset: UTF-8\n"
-"X-Poedit-KeywordsList: __;_e;_n:1,2;_x:1,2c;_ex:1,2c;_nx:4c,1,2;esc_attr__;"
-"esc_attr_e;esc_attr_x:1,2c;esc_html__;esc_html_e;esc_html_x:1,2c;_n_noop:1,2;"
-"_nx_noop:3c,1,2;__ngettext_noop:1,2\n"
-"X-Poedit-SearchPath-0: .\n"
-"X-Poedit-SearchPathExcluded-0: *.min.js\n"
+"POT-Creation-Date: 2026-08-14T19:30:06+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: server-info\n"
 
-#: server-info.php:105 server-info.php:499
-msgid "Server Information"
+#. Plugin Name of the plugin
+#: server-info.php
+msgid "Server Info - System Health & Diagnostics Suite"
 msgstr ""
 
-#. Plugin Name of the plugin/theme
-#: server-info.php:106 server-info.php:121
+#. Plugin URI of the plugin
+#: server-info.php
+msgid "https://wordpress.org/plugins/server-info/"
+msgstr ""
+
+#. Description of the plugin
+#: server-info.php
+msgid "The ultimate dashboard to monitor server configuration, database health, caching performance, and critical WordPress diagnostics in real-time."
+msgstr ""
+
+#. Author of the plugin
+#: server-info.php
+msgid "Usman Ali Qureshi"
+msgstr ""
+
+#. Author URI of the plugin
+#: server-info.php
+msgid "https://usmanaliqureshi.com/"
+msgstr ""
+
+#: server-info.php:228
+#: server-info.php:309
+#: server-info.php:416
+#: server-info.php:1253
 msgid "Server Info"
 msgstr ""
 
-#: server-info.php:138 server-info.php:216
-msgid "Operating System"
+#: server-info.php:235
+msgid "Server IP: "
 msgstr ""
 
-#: server-info.php:147 server-info.php:229
-msgid "Server IP"
+#: server-info.php:238
+#: server-info.php:811
+#: server-info.php:1882
+msgid "Unknown"
 msgstr ""
 
-#: server-info.php:156 server-info.php:222
-msgid "Server Hostname"
+#: server-info.php:246
+msgid "Web Server: "
 msgstr ""
 
-#: server-info.php:165
-msgid "PHP Version"
+#: server-info.php:252
+msgid "Operating System: "
 msgstr ""
 
-#: server-info.php:173
+#: server-info.php:261
+msgid "Database: "
+msgstr ""
+
+#: server-info.php:267
+msgid "WordPress: "
+msgstr ""
+
+#: server-info.php:273
+msgid "PHP Memory Limit: "
+msgstr ""
+
+#: server-info.php:280
+msgid "WP Memory Limit: "
+msgstr ""
+
+#: server-info.php:362
+msgid "Opening secure checkout..."
+msgstr ""
+
+#: server-info.php:363
+msgid "Support checkout is temporarily unavailable. Please try again later."
+msgstr ""
+
+#: server-info.php:364
+msgid "Thank you for supporting Server Info."
+msgstr ""
+
+#: server-info.php:379
+msgid "Supporter"
+msgstr ""
+
+#: server-info.php:381
+msgid "A small thank-you that helps keep Server Info maintained."
+msgstr ""
+
+#: server-info.php:386
+msgid "Backer"
+msgstr ""
+
+#: server-info.php:388
+msgid "Fuel ongoing updates, testing, and thoughtful maintenance."
+msgstr ""
+
+#: server-info.php:392
+msgid "Sponsor"
+msgstr ""
+
+#: server-info.php:394
+msgid "Help shape new diagnostics and stronger, more reliable releases."
+msgstr ""
+
+#: server-info.php:398
+msgid "Agency Sponsor"
+msgstr ""
+
+#: server-info.php:400
+msgid "Sustain Server Info for agencies managing client websites."
+msgstr ""
+
+#: server-info.php:415
+msgid "Server Information"
+msgstr ""
+
+#: server-info.php:539
+msgid "Default"
+msgstr ""
+
+#: server-info.php:543
+msgid "Calm Blue"
+msgstr ""
+
+#: server-info.php:555
+msgid "Fresh Green"
+msgstr ""
+
+#: server-info.php:567
+msgid "High Contrast"
+msgstr ""
+
+#: server-info.php:579
+msgid "Custom Colors"
+msgstr ""
+
+#. translators: %s: Maximum PHP execution time in seconds.
+#: server-info.php:740
+#: server-info.php:742
+#: server-info.php:744
+#: server-info.php:835
+#: server-info.php:915
+#: server-info.php:917
+#: server-info.php:919
+#: server-info.php:1880
+#: server-info.php:2200
+#: server-info.php:2229
+#: server-info.php:2311
+#: server-info.php:2337
+#: server-info.php:2343
+#: server-info.php:2349
+#: server-info.php:2355
+#: server-info.php:2373
+msgid "Unavailable"
+msgstr ""
+
+#: server-info.php:741
+msgid "SSL certificate details could not be read for this site."
+msgstr ""
+
+#: server-info.php:750
+msgid "SSL lookup is skipped for local, test, or IP-based domains."
+msgstr ""
+
+#: server-info.php:761
+msgid "The required PHP stream or OpenSSL functions are not available."
+msgstr ""
+
+#: server-info.php:780
+msgid "Connection to port 443 failed."
+msgstr ""
+
+#: server-info.php:806
+msgid "Valid"
+msgstr ""
+
+#: server-info.php:807
+msgid "Certificate is active for this domain."
+msgstr ""
+
+#: server-info.php:812
+msgid "Certificate expiry date is not available."
+msgstr ""
+
+#: server-info.php:815
+#: server-info.php:973
+msgid "Expired"
+msgstr ""
+
+#: server-info.php:816
+msgid "Certificate has expired."
+msgstr ""
+
+#: server-info.php:819
+#: server-info.php:977
+msgid "Expiring Soon"
+msgstr ""
+
+#: server-info.php:820
+msgid "Certificate expires within 30 days."
+msgstr ""
+
+#: server-info.php:825
+msgid "Domain Mismatch"
+msgstr ""
+
+#: server-info.php:826
+msgid "Certificate does not appear to match the site domain."
+msgstr ""
+
+#: server-info.php:833
+msgid "Unknown issuer"
+msgstr ""
+
+#: server-info.php:916
+msgid "Domain expiry could not be determined."
+msgstr ""
+
+#: server-info.php:925
+msgid "Domain expiry lookup is disabled in Server Info settings."
+msgstr ""
+
+#: server-info.php:930
+msgid "Domain expiry lookup is skipped for local, test, or IP-based domains."
+msgstr ""
+
+#: server-info.php:945
+msgid "No RDAP or WHOIS expiry data is available for this domain extension."
+msgstr ""
+
+#: server-info.php:952
+msgid "Domain lookup timed out or returned no data."
+msgstr ""
+
+#: server-info.php:961
+msgid "Domain lookup did not include a recognizable expiry date."
+msgstr ""
+
+#: server-info.php:968
+#: server-info.php:1635
+#: server-info.php:2535
+msgid "Active"
+msgstr ""
+
+#: server-info.php:969
+msgid "Domain registration appears active."
+msgstr ""
+
+#: server-info.php:974
+msgid "Domain registration appears expired."
+msgstr ""
+
+#: server-info.php:978
+msgid "Domain expires within 30 days."
+msgstr ""
+
+#: server-info.php:985
+msgid "Unknown registrar"
+msgstr ""
+
+#: server-info.php:1287
 msgid "View More Information"
 msgstr ""
 
-#: server-info.php:192
+#: server-info.php:1308
 msgid "Hosting Server Information"
 msgstr ""
 
-#: server-info.php:204
-msgid "(Supports 64bit values)"
-msgstr ""
-
-#: server-info.php:204
-msgid "(Does not support 64bit values)"
-msgstr ""
-
-#: server-info.php:207
+#: server-info.php:1319
 msgid "Unable to determine PHP version"
 msgstr ""
 
-#: server-info.php:217
+#: server-info.php:1347
+msgid "Operating System"
+msgstr ""
+
+#: server-info.php:1348
 msgid "Unable to determine server architecture"
 msgstr ""
 
-#: server-info.php:236
+#: server-info.php:1353
+msgid "Server Hostname"
+msgstr ""
+
+#: server-info.php:1361
+msgid "Server IP"
+msgstr ""
+
+#: server-info.php:1369
 msgid "Server Protocol"
 msgstr ""
 
-#: server-info.php:243
+#: server-info.php:1377
 msgid "Server Administrator"
 msgstr ""
 
-#: server-info.php:250
+#: server-info.php:1385
 msgid "Server Web Port"
 msgstr ""
 
-#: server-info.php:258
+#: server-info.php:1397
 msgid "System Uptime"
 msgstr ""
 
-#: server-info.php:264
+#: server-info.php:1406
+msgid "Load Average"
+msgstr ""
+
+#: server-info.php:1414
+msgid "PHP Memory Usage"
+msgstr ""
+
+#: server-info.php:1428
+msgid "Active PHP Extensions"
+msgstr ""
+
+#: server-info.php:1436
+msgid "wp-config.php Permissions"
+msgstr ""
+
+#: server-info.php:1447
+msgid "wp-content Permissions"
+msgstr ""
+
+#: server-info.php:1454
+msgid "Uploads Directory Permissions"
+msgstr ""
+
+#: server-info.php:1460
 msgid "Web server"
 msgstr ""
 
-#: server-info.php:265
+#: server-info.php:1461
 msgid "Unable to determine what web server software is used"
 msgstr ""
 
-#: server-info.php:269
+#: server-info.php:1465
 msgid "PHP version"
 msgstr ""
 
-#: server-info.php:276
+#: server-info.php:1472
 msgid "PHP memory limit"
 msgstr ""
 
-#: server-info.php:283
+#: server-info.php:1478
+msgid "Server Timezone"
+msgstr ""
+
+#: server-info.php:1485
 msgid "CGI Version"
 msgstr ""
 
-#: server-info.php:292
+#: server-info.php:1494
+#: server-info.php:1832
+#: server-info.php:2040
 msgid "Database"
 msgstr ""
 
-#: server-info.php:322
+#: server-info.php:1519
 msgid "Extension"
 msgstr ""
 
-#: server-info.php:327
+#: server-info.php:1524
 msgid "Server version"
 msgstr ""
 
-#: server-info.php:332
+#: server-info.php:1529
 msgid "Client version"
 msgstr ""
 
-#: server-info.php:337
+#: server-info.php:1534
 msgid "Database username"
 msgstr ""
 
-#: server-info.php:343
+#: server-info.php:1540
 msgid "Database host"
 msgstr ""
 
-#: server-info.php:349
+#: server-info.php:1546
 msgid "Database name"
 msgstr ""
 
-#: server-info.php:355
+#: server-info.php:1559
+msgid "Total Database size"
+msgstr ""
+
+#: server-info.php:1581
+msgid "Top 5 Largest Tables"
+msgstr ""
+
+#: server-info.php:1588
 msgid "Table prefix"
 msgstr ""
 
-#: server-info.php:361
+#: server-info.php:1594
 msgid "Database charset"
 msgstr ""
 
-#: server-info.php:367
+#: server-info.php:1600
 msgid "Database collation"
 msgstr ""
 
-#: server-info.php:377
+#: server-info.php:1612
+msgid "Max Connections"
+msgstr ""
+
+#: server-info.php:1619
+msgid "Max Allowed Packet"
+msgstr ""
+
+#: server-info.php:1628
+msgid "Caching & Performance"
+msgstr ""
+
+#: server-info.php:1634
+msgid "Object Cache Drop-in"
+msgstr ""
+
+#: server-info.php:1635
+msgid "Inactive"
+msgstr ""
+
+#: server-info.php:1647
+#: server-info.php:1653
+msgid "OPcache Status"
+msgstr ""
+
+#. translators: %s: OPcache hit-rate percentage.
+#: server-info.php:1649
+#, php-format
+msgid "Enabled (Hit Rate: %s%%)"
+msgstr ""
+
+#: server-info.php:1654
+msgid "Disabled or Restricted"
+msgstr ""
+
+#: server-info.php:1664
 msgid "WordPress Information"
 msgstr ""
 
-#: server-info.php:380
+#: server-info.php:1667
 msgid "Is this a multisite?"
 msgstr ""
 
-#: server-info.php:381
+#: server-info.php:1668
 msgid "Yes"
 msgstr ""
 
-#: server-info.php:381
+#: server-info.php:1668
 msgid "No"
 msgstr ""
 
-#: server-info.php:402 server-info.php:419
+#: server-info.php:1689
+#: server-info.php:1706
 msgid "User count"
 msgstr ""
 
-#: server-info.php:407
+#: server-info.php:1694
 msgid "Site count"
 msgstr ""
 
-#: server-info.php:412
+#: server-info.php:1699
 msgid "Network count"
 msgstr ""
 
-#: server-info.php:427
+#: server-info.php:1714
 msgid "Active Theme"
 msgstr ""
 
-#: server-info.php:429
+#. translators: 1: Theme name, 2: Theme stylesheet directory.
+#: server-info.php:1717
 #, php-format
 msgid "%1$s (%2$s)"
 msgstr ""
 
-#: server-info.php:445
+#. translators: %s: Plugin author name.
+#: server-info.php:1737
 #, php-format
 msgid "By %s"
 msgstr ""
 
-#: server-info.php:458 server-info.php:466
+#: server-info.php:1750
+#: server-info.php:1758
 msgid "None"
 msgstr ""
 
-#: server-info.php:461
+#: server-info.php:1753
 msgid "Active Plugins"
 msgstr ""
 
-#: server-info.php:469
+#: server-info.php:1761
 msgid "Inactive Plugins"
 msgstr ""
 
-#: server-info.php:474
+#: server-info.php:1766
 msgid "WordPress Memory Limit"
 msgstr ""
 
-#: server-info.php:479
+#: server-info.php:1771
 msgid "WordPress Max Memory Limit"
 msgstr ""
 
-#: server-info.php:484
+#: server-info.php:1776
 msgid "WordPress Debugging"
 msgstr ""
 
-#: server-info.php:485
+#: server-info.php:1777
+#: server-info.php:1780
+#: server-info.php:2315
 msgid "Enabled"
 msgstr ""
 
-#: server-info.php:485
+#: server-info.php:1777
+#: server-info.php:2315
 msgid "Disabled"
 msgstr ""
 
-#: server-info.php:501
-msgid ""
-"Server Info plugin shows the general information about the hosting server "
-"your WordPress site is currently hosted on. You can find this information "
-"helpful for many purposes like performance improvements and so on."
+#: server-info.php:1780
+msgid "Disabled via wp-config.php"
 msgstr ""
 
-#. Plugin URI of the plugin/theme
-msgid "https://github.com/usmanaliqureshi/server-info"
+#: server-info.php:1782
+msgid "WP-Cron Status"
 msgstr ""
 
-#. Description of the plugin/theme
-msgid ""
-"This plugin will show you useful information about the hosting server you "
-"are using e.g. PHP version, MySQL version, Server OS, Server Protocol, "
-"Server IP and other useful information. You can use the information "
-"displayed by this plugin to update any settings which is crucial for your "
-"website performance and other aspects."
+#. translators: %s: Human-readable time until a cron event runs.
+#: server-info.php:1795
+#, php-format
+msgid "In %s"
 msgstr ""
 
-#. Author of the plugin/theme
-msgid "Usman Ali Qureshi"
+#: server-info.php:1801
+msgid "Next 3 Cron Events"
 msgstr ""
 
-#. Author URI of the plugin/theme
-msgid "https://profiles.wordpress.org/usmanaliqureshi"
+#: server-info.php:1828
+#: server-info.php:2037
+msgid "Overview"
+msgstr ""
+
+#: server-info.php:1829
+msgid "Real-time summary of your server health and configuration."
+msgstr ""
+
+#: server-info.php:1833
+msgid "MySQL and database limits that affect performance and stability."
+msgstr ""
+
+#: server-info.php:1836
+#: server-info.php:2043
+#: server-info.php:2897
+msgid "WordPress Core"
+msgstr ""
+
+#: server-info.php:1837
+msgid "Important WordPress configuration, theme, plugin, and cron details."
+msgstr ""
+
+#: server-info.php:1840
+#: server-info.php:2046
+msgid "PHP Information"
+msgstr ""
+
+#: server-info.php:1841
+msgid "Detailed PHP runtime configuration for debugging hosting issues."
+msgstr ""
+
+#: server-info.php:1844
+#: server-info.php:2049
+msgid "Caching"
+msgstr ""
+
+#: server-info.php:1845
+msgid "Caching and optimization signals from your hosting environment."
+msgstr ""
+
+#: server-info.php:1848
+#: server-info.php:2052
+msgid "Diagnostics & Logs"
+msgstr ""
+
+#: server-info.php:1849
+msgid "Health checks and debug-log visibility for administrators."
+msgstr ""
+
+#: server-info.php:1852
+#: server-info.php:2055
+msgid "More Plugins"
+msgstr ""
+
+#: server-info.php:1853
+msgid "Other lightweight WordPress tools from the same author."
+msgstr ""
+
+#: server-info.php:1856
+#: server-info.php:2058
+msgid "Settings"
+msgstr ""
+
+#: server-info.php:1857
+msgid "Control where Server Info appears in the WordPress admin."
+msgstr ""
+
+#: server-info.php:1860
+#: server-info.php:2095
+msgid "Support Development"
+msgstr ""
+
+#: server-info.php:1861
+msgid "Help keep Server Info maintained, tested, and free for everyone."
+msgstr ""
+
+#: server-info.php:1929
+msgid "Latest"
+msgstr ""
+
+#: server-info.php:1934
+msgid "Critical"
+msgstr ""
+
+#: server-info.php:1939
+msgid "Update recommended"
+msgstr ""
+
+#: server-info.php:1956
+msgid "Up to date"
+msgstr ""
+
+#: server-info.php:1963
+msgid "Update available"
+msgstr ""
+
+#: server-info.php:2061
+#: server-info.php:2689
+msgid "Support"
+msgstr ""
+
+#: server-info.php:2093
+msgid "Support the Author"
+msgstr ""
+
+#: server-info.php:2094
+msgid "A small contribution helps maintain compatibility, testing, and new diagnostics."
+msgstr ""
+
+#: server-info.php:2107
+msgid "Refresh Data"
+msgstr ""
+
+#: server-info.php:2159
+msgid "Basic Information"
+msgstr ""
+
+#: server-info.php:2165
+msgid "Hosting"
+msgstr ""
+
+#: server-info.php:2188
+msgid "SSL/TLS Certificate"
+msgstr ""
+
+#: server-info.php:2192
+msgid "Issued by"
+msgstr ""
+
+#: server-info.php:2193
+#: server-info.php:2222
+msgid "Domain"
+msgstr ""
+
+#: server-info.php:2194
+msgid "Expiry"
+msgstr ""
+
+#: server-info.php:2196
+#: server-info.php:2225
+msgid "Days left"
+msgstr ""
+
+#. translators: %s: Number of days since the certificate expired.
+#. translators: %s: Number of days since the domain registration expired.
+#: server-info.php:2203
+#: server-info.php:2232
+#, php-format
+msgid "%s days ago"
+msgstr ""
+
+#. translators: %s: Number of days until the certificate expires.
+#. translators: %s: Number of days until the domain registration expires.
+#: server-info.php:2206
+#: server-info.php:2235
+#, php-format
+msgid "%s days"
+msgstr ""
+
+#: server-info.php:2217
+msgid "Domain Expiry"
+msgstr ""
+
+#: server-info.php:2221
+msgid "Registrar"
+msgstr ""
+
+#: server-info.php:2223
+msgid "Expiry date"
+msgstr ""
+
+#: server-info.php:2317
+msgid "Loaded"
+msgstr ""
+
+#: server-info.php:2323
+#: server-info.php:2740
+#: server-info.php:2852
+msgid "PHP Version"
+msgstr ""
+
+#: server-info.php:2329
+msgid "Memory Limit"
+msgstr ""
+
+#: server-info.php:2331
+msgid "Per PHP process"
+msgstr ""
+
+#: server-info.php:2335
+msgid "Max Execution"
+msgstr ""
+
+#. translators: %s: Maximum PHP execution time in seconds.
+#: server-info.php:2337
+#, php-format
+msgid "%s sec"
+msgstr ""
+
+#: server-info.php:2338
+msgid "Script timeout"
+msgstr ""
+
+#: server-info.php:2342
+msgid "Upload Max"
+msgstr ""
+
+#: server-info.php:2344
+msgid "File upload limit"
+msgstr ""
+
+#: server-info.php:2348
+msgid "Post Max Size"
+msgstr ""
+
+#: server-info.php:2350
+msgid "Request body limit"
+msgstr ""
+
+#: server-info.php:2354
+msgid "PHP SAPI"
+msgstr ""
+
+#: server-info.php:2356
+msgid "Runtime interface"
+msgstr ""
+
+#: server-info.php:2360
+msgid "OPcache"
+msgstr ""
+
+#: server-info.php:2362
+msgid "Bytecode cache"
+msgstr ""
+
+#: server-info.php:2366
+msgid "Extensions"
+msgstr ""
+
+#: server-info.php:2368
+msgid "Loaded modules"
+msgstr ""
+
+#: server-info.php:2372
+msgid "Max Input Vars"
+msgstr ""
+
+#: server-info.php:2374
+msgid "Form fields limit"
+msgstr ""
+
+#: server-info.php:2489
+msgid "Advance Canonical URL"
+msgstr ""
+
+#: server-info.php:2490
+msgid "Easily manage and customize canonical URLs to eliminate duplicate content issues and boost your SEO rankings."
+msgstr ""
+
+#: server-info.php:2496
+msgid "Metaviewer - Debug Meta Data"
+msgstr ""
+
+#: server-info.php:2497
+msgid "The ultimate developer tool to instantly view, inspect, and debug post, user, and term meta data directly from the frontend."
+msgstr ""
+
+#: server-info.php:2503
+msgid "Randomize Password"
+msgstr ""
+
+#: server-info.php:2504
+msgid "Enhance your security by forcing highly secure, completely randomized passwords for user accounts upon creation or reset."
+msgstr ""
+
+#: server-info.php:2510
+msgid "Fusion Pricing Tables"
+msgstr ""
+
+#: server-info.php:2511
+msgid "Build flexible Elementor pricing tables with 15 ready-made skins, billing toggles, ribbons, and responsive controls."
+msgstr ""
+
+#: server-info.php:2539
+msgid "Activate"
+msgstr ""
+
+#: server-info.php:2543
+msgid "Install Now"
+msgstr ""
+
+#: server-info.php:2564
+msgid "Admin Display Settings"
+msgstr ""
+
+#: server-info.php:2570
+msgid "Admin Bar HUD"
+msgstr ""
+
+#: server-info.php:2571
+msgid "Show environment, PHP version, and memory usage in the WordPress admin bar."
+msgstr ""
+
+#: server-info.php:2580
+msgid "Admin Footer Diagnostics"
+msgstr ""
+
+#: server-info.php:2581
+msgid "Show a compact environment and memory summary in the admin footer."
+msgstr ""
+
+#: server-info.php:2590
+msgid "Domain Expiry Lookup"
+msgstr ""
+
+#: server-info.php:2591
+msgid "Check public RDAP or WHOIS registration data for the site domain and cache the result to keep Overview fast."
+msgstr ""
+
+#: server-info.php:2600
+msgid "Appearance"
+msgstr ""
+
+#: server-info.php:2601
+msgid "Choose a layout color preset or set a custom background and text color for the Server Info admin screen."
+msgstr ""
+
+#: server-info.php:2612
+msgid "Background"
+msgstr ""
+
+#: server-info.php:2616
+msgid "Text"
+msgstr ""
+
+#: server-info.php:2621
+msgid "Save Settings"
+msgstr ""
+
+#: server-info.php:2627
+msgid "Privacy Note"
+msgstr ""
+
+#: server-info.php:2629
+msgid "Server Info only displays diagnostics to administrators. Some values can include internal hostnames, IP addresses, file paths, and debug-log lines, so avoid sharing screenshots publicly without reviewing them first."
+msgstr ""
+
+#: server-info.php:2649
+#: server-info.php:2701
+msgid "Support Server Info"
+msgstr ""
+
+#: server-info.php:2650
+msgid "If Server Info helped you debug a hosting issue, prepare a support ticket, or understand a slow site, your support helps keep the plugin maintained and compatible with new WordPress and PHP releases."
+msgstr ""
+
+#: server-info.php:2653
+msgid "Choose Support Amount"
+msgstr ""
+
+#: server-info.php:2656
+msgid "Leave a Review"
+msgstr ""
+
+#: server-info.php:2659
+msgid "Get Support"
+msgstr ""
+
+#: server-info.php:2666
+msgid "What Your Support Funds"
+msgstr ""
+
+#: server-info.php:2669
+msgid "Compatibility testing for new WordPress and PHP releases."
+msgstr ""
+
+#: server-info.php:2670
+msgid "Safer diagnostics, redaction, and export workflows."
+msgstr ""
+
+#: server-info.php:2671
+msgid "Better WooCommerce, cron, cache, and database health checks."
+msgstr ""
+
+#: server-info.php:2672
+msgid "Faster fixes for hosting-specific edge cases."
+msgstr ""
+
+#: server-info.php:2695
+msgid "Close support options"
+msgstr ""
+
+#: server-info.php:2702
+msgid "Choose any one-time amount that feels right. The plugin stays free for everyone."
+msgstr ""
+
+#: server-info.php:2736
+msgid "PHP Runtime Summary"
+msgstr ""
+
+#: server-info.php:2744
+msgid "Server API"
+msgstr ""
+
+#: server-info.php:2748
+msgid "Loaded Extensions"
+msgstr ""
+
+#: server-info.php:2756
+msgid "Current PHP Settings"
+msgstr ""
+
+#: server-info.php:2759
+msgid "PHP configuration values are unavailable on this server."
+msgstr ""
+
+#: server-info.php:2766
+msgid "Hidden"
+msgstr ""
+
+#: server-info.php:2768
+msgid "Not set"
+msgstr ""
+
+#: server-info.php:2867
+msgid "PHP Memory Limit"
+msgstr ""
+
+#: server-info.php:2882
+msgid "wp-config.php"
+msgstr ""
+
+#: server-info.php:2912
+msgid "Native PHP Error Log"
+msgstr ""
+
+#: server-info.php:2925
+msgid "Server Debug Log"
+msgstr ""
+
+#: server-info.php:2942
+msgid "Debug log is currently empty."
+msgstr ""
+
+#: server-info.php:2945
+msgid "Debug log not found or not readable. Ensure WP_DEBUG and WP_DEBUG_LOG are enabled in wp-config.php."
 msgstr ""

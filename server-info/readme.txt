@@ -1,69 +1,99 @@
 === Server Info - System Health & Diagnostics Suite ===
 Contributors: usmanaliqureshi
-Tags: admin, dashboard, server info, widget, server status, memory usage, php version
-Requires at least: 5.0
+Tags: server info, server status, php info, system health, diagnostics
+Requires at least: 5.5
 Tested up to: 7.0
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 Requires PHP: 7.3
 License: GPLv2 or later
-License URI: http://www.gnu.org/licenses/gpl-2.0.html
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-The ultimate free Server Info plugin for WordPress. View Memory Limits, PHP/MySQL versions, Datacenter Location, and an Always-On Admin HUD.
+Inspect WordPress, PHP, database, caching, SSL, and server health from one administrator-only dashboard.
 
 == Description ==
 
-**Server Info - System Health & Diagnostics Suite** provides a stunning, comprehensive dashboard to track your server’s health, debug fatal errors, and monitor database limits—all for free.
+Server Info provides a practical dashboard for inspecting the hosting environment behind a WordPress site. It brings important WordPress, PHP, database, caching, certificate, and diagnostic details together without changing the public site.
 
-Why pay for a PRO server monitoring plugin when you can get all the premium features out-of-the-box? This plugin gives you a detailed look into your web hosting environment, helping you easily identify bottlenecks, memory limits, and configuration errors that could be slowing down your site or crashing WooCommerce.
+All diagnostic features are free. The optional Support area offers one-time voluntary payments through Freemius; paying does not unlock or restrict plugin functionality.
 
-### 🌟 Premium Features included for FREE:
-* **Always-On Admin Bar HUD:** A sleek HUD in your top WordPress admin bar showing your Environment (Local/Staging/Production), PHP version, and live RAM usage percentage.
-* **Smart Environment Badges:** Auto-detects if you are on a Local or Staging site, displaying a color-coded badge so you never accidentally break a live production site!
-* **Advanced Database Limits:** View your `Max Connections` and `Max Allowed Packet` to prevent your database from crashing during high-traffic events.
+= Overview and diagnostics =
 
-### 📊 Comprehensive System Diagnostics:
-* **PHP Information:** PHP Version, Memory Limit, Active Extensions, OPcache Status, Output Buffering.
-* **Database Information:** MySQL Version, Database Size, Top 5 Largest Tables, Charset & Collation.
-* **WordPress Configuration:** WP Memory Limit, Debug Mode Status, Multisite Detection, Cron Status.
-* **Server Details:** Server IP, Web Server Software (Nginx/Apache), OS, System Uptime.
-* **Permissions Check:** Detects the file permissions for your `wp-config.php`, `wp-content`, and `uploads` directories.
+* Server hostname, IP address, protocol, operating system, web server, and resource usage.
+* SSL/TLS issuer, hostname, expiry date, and remaining days, with graceful unavailable states.
+* Optional domain registration expiry and registrar lookup, disabled by default.
+* PHP version, limits, extensions, configuration summary, and a detailed phpinfo view.
+* Database version, size, charset, collation, limits, and largest tables.
+* WordPress version, memory, debugging, permalinks, theme, and plugin status.
+* OPcache, Redis, Memcached, object cache, and output buffering detection.
+* Configuration, file permission, cron, and error-log diagnostics.
 
-Please rate the Plugin if you find it useful, thanks!
+= Administrator controls =
+
+* Optional admin bar environment HUD.
+* Compact optional admin footer summary.
+* Display schemes and custom background/text colors.
+* Settings for external domain-expiry lookup and admin display elements.
+
+The dashboard and HUD are available only to users with the `manage_options` capability.
+
+== External Services ==
+
+Server Info includes the Freemius SDK for optional usage opt-in and voluntary one-time supporter payments. Freemius communication is subject to user consent where requested by the SDK. The checkout script is loaded from `checkout.freemius.com` only after an administrator selects a support amount. See the [Freemius privacy policy](https://freemius.com/privacy/) and [terms](https://freemius.com/terms/).
+
+The optional domain-expiry setting is disabled by default. When enabled and an administrator opens the dashboard, the plugin sends the site's registrable domain to an HTTPS RDAP service operated by the relevant registry or `rdap.org`. If RDAP cannot provide a result, it may query the relevant public WHOIS server over port 43. These services use the domain name to return public registration data. See the [RDAP bootstrap service](https://data.iana.org/rdap/dns.json), [RDAP.org](https://rdap.org/), and the applicable registry's terms and privacy policy.
+
+The SSL/TLS certificate check connects from the WordPress server to the site's own hostname on port 443 to read the public certificate. No visitor data is sent.
 
 == Installation ==
 
-1. In your WordPress admin, go to Plugins -> Add New.
-2. Enter "Server Info" in the text box and click Search Plugins.
-3. In the list of Plugins, click Install Now next to the Server Info Plugin.
-4. Once installed, click to activate.
-5. Go to your WordPress Settings -> Server Info to view the detailed dashboard!
+1. Install and activate Server Info from Plugins -> Add New.
+2. Open Settings -> Server Info.
+3. Review Settings before enabling the optional domain-expiry lookup.
 
 == Frequently Asked Questions ==
 
-= Does this plugin work with all major PHP versions? =
+= Does it change my frontend? =
 
-Yes! It is fully compatible and tested with PHP 7.3, 7.4, 8.0, 8.1, 8.2, and 8.3.
+No. Server Info is an administrator diagnostic tool. The optional admin bar HUD can appear while an administrator views the frontend, but it is not shown to visitors.
 
-= Does it slow down my website? =
+= Does the domain-expiry lookup run automatically? =
 
-Absolutely not. The Server Location is cached for 30 days via transients, and the metrics are only loaded when an Administrator is logged into the backend. It has zero impact on your frontend site speed.
+No. It is disabled by default and can be enabled from the plugin's Settings tab.
 
-= Is Server Info Plugin GDPR compliant? =
+= Does supporting the plugin unlock features? =
 
-Yes, absolutely. It only queries local server environments and does not track your website visitors.
+No. Support payments are voluntary, one-time contributions. Every plugin feature remains available without payment.
+
+= Who can view Server Info? =
+
+Only users with the `manage_options` capability can access the dashboard and its server details.
+
+= Does it detect caching? =
+
+Yes. It checks for common signals from OPcache, Redis, Memcached, persistent object caching, and output buffering.
 
 == Screenshots ==
 
-1. Overview Dashboard - Real-time server health and configuration summary.
-2. Database Information - Detailed MySQL statistics and connection details.
-3. WordPress Core - Important WordPress configurations and debug status.
-4. PHP Information - Complete and beautifully styled phpinfo() output.
-5. Diagnostics & Logs - Evaluate server health with detailed score impacts.
-6. More Plugins - Additional tools to enhance your server experience.
+1. Overview with server health, hosting, SSL/TLS, and optional domain-expiry details.
+2. Database information, limits, and largest-table summary.
+3. WordPress configuration and plugin status.
+4. PHP configuration, limits, and extension summary.
+5. Diagnostics with actionable health checks.
+6. Settings for the admin HUD, footer, external lookup, and appearance.
+7. Voluntary one-time support plans, with every feature remaining free.
+8. Additional lightweight WordPress plugins from the author.
 
 == Changelog ==
 
+= 1.1.0 =
+* Added SSL/TLS certificate issuer, hostname, expiry, and remaining-day information.
+* Added an optional domain registrar and expiry lookup, disabled by default.
+* Added display settings for the admin bar HUD and compact admin footer.
+* Added multiple appearance schemes and custom color controls.
+* Added more useful PHP configuration details and improved unavailable states.
+* Added voluntary one-time support plans through Freemius; all features remain free.
+* Added a More Plugins view and refreshed the administrator interface.
+* Improved privacy disclosures, checkout loading, responsive layout, and failure handling.
+
 = 1.0.0 =
-* Initial Release. Completely restructured core.
-* Added Admin Bar HUD and Footer replacements.
-* Added Smart Environment Badges.
+* Initial release with the system dashboard, admin bar HUD, footer summary, and environment badges.
