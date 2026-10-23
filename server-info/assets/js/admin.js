@@ -182,9 +182,32 @@
 		} );
 	}
 
-	if ( 'loading' === document.readyState ) {
-		document.addEventListener( 'DOMContentLoaded', initSupportCheckout );
-	} else {
+	function initFloatingSupport() {
+		var button = document.querySelector( '.si-floating-support-button' );
+		var main = document.querySelector( '.si-main' );
+
+		if ( ! button ) {
+			return;
+		}
+
+		// The page may scroll on the window or inside .si-main, so watch both (capture catches element scrolls).
+		function update() {
+			var scrolled = Math.max( window.pageYOffset || 0, main ? main.scrollTop : 0 );
+			button.classList.toggle( 'is-compact', scrolled > 160 );
+		}
+
+		document.addEventListener( 'scroll', update, { passive: true, capture: true } );
+		update();
+	}
+
+	function init() {
 		initSupportCheckout();
+		initFloatingSupport();
+	}
+
+	if ( 'loading' === document.readyState ) {
+		document.addEventListener( 'DOMContentLoaded', init );
+	} else {
+		init();
 	}
 }() );

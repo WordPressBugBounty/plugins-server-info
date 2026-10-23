@@ -3,7 +3,7 @@
  * Plugin Name: Server Info - System Health & Diagnostics Suite
  * Plugin URI: https://wordpress.org/plugins/server-info/
  * Description: The ultimate dashboard to monitor server configuration, database health, caching performance, and critical WordPress diagnostics in real-time.
- * Version: 1.1.0
+ * Version: 1.1.1
  * Requires at least: 5.5
  * Requires PHP: 7.3
  * Author: Usman Ali Qureshi
@@ -61,7 +61,7 @@ if ( ! function_exists( 'server_info_fs' ) ) {
 }
 
 // Set the plugin version.
-define( 'SERVER_INFO_PLUGIN_VERSION', '1.1.0' );
+define( 'SERVER_INFO_PLUGIN_VERSION', '1.1.1' );
 
 // Set the plugin file.
 define( 'SERVER_INFO_PLUGIN_FILE', __FILE__ );
@@ -74,6 +74,9 @@ define( 'SERVER_INFO_PLUGIN_URL', plugins_url( '/', __FILE__ ) );
 
 // Set the plugin option key.
 define( 'SERVER_INFO_OPTION_NAME', 'server_info_options' );
+
+// Stores the PHP version an administrator confirmed as patched for PHP2Shell.
+define( 'SERVER_INFO_PHP_ACK_OPTION', 'server_info_php2shell_ack' );
 
 // Freemius product values for the optional supporter checkout.
 define( 'SERVER_INFO_FREEMIUS_PRODUCT_ID', '2860' );
@@ -179,6 +182,11 @@ class Server_Info {
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'admin_scripts' ) );
 		add_action( 'admin_bar_menu', array( $this, 'add_admin_bar_hud' ), 999 );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_bar_hud_style' ) );
+		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_admin_bar_hud_style' ) );
+		add_action( 'admin_notices', array( $this, 'render_php_security_notice' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_menu_pointer' ) );
+		add_action( 'admin_post_server_info_php2shell_ack', array( $this, 'handle_php_security_ack' ) );
 
 		// Footer HUD
 		add_filter( 'admin_footer_text', array( $this, 'add_admin_footer_text' ), 999 );
@@ -187,98 +195,292 @@ class Server_Info {
 
 	/**
 	 * Add Always-On HUD to WordPress Admin Bar.
+	 *
+	 * The bar item shows the environment, a status dot and PHP/RAM. The dropdown groups site,
+	 * server, software and memory details under a status summary. SSL, domain and public IP
+	 * values come from checks the Overview already cached, so the HUD never makes network requests.
+	 *
+	 * @param WP_Admin_Bar $wp_admin_bar Admin bar instance.
+	 * @return void
 	 */
-	 public function add_admin_bar_hud( $wp_admin_bar ) {
-		 if ( ! current_user_can( 'manage_options' ) ) {
-			 return;
-		 }
+	public function add_admin_bar_hud( $wp_admin_bar ) {
+		if ( ! current_user_can( 'manage_options' ) || ! self::is_admin_bar_hud_enabled() ) {
+			return;
+		}
 
-		 if ( ! self::is_admin_bar_hud_enabled() ) {
-			 return;
-		 }
+		global $wp_version, $wpdb;
 
-		$env = self::get_environment_type();
-		$env_color = '#d63638'; // Red for Production
+		$env       = self::get_environment_type();
+		$env_class = 'production';
 		if ( 'Local' === $env ) {
-			$env_color = '#00a32a'; // Green for Local
+			$env_class = 'local';
 		} elseif ( 'Staging' === $env ) {
-			$env_color = '#dba617'; // Orange for Staging
+			$env_class = 'staging';
 		}
 
-		$php_version = substr( phpversion(), 0, 3 );
-		
-		$memory_usage = memory_get_peak_usage( true );
+		$php_version        = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '.' . PHP_RELEASE_VERSION;
+		$memory_usage       = memory_get_peak_usage( true );
 		$memory_limit_bytes = wp_convert_hr_to_bytes( ini_get( 'memory_limit' ) );
+		$memory_percentage  = $memory_limit_bytes > 0 ? round( ( $memory_usage / $memory_limit_bytes ) * 100 ) . '%' : size_format( $memory_usage );
 
-		if ( $memory_limit_bytes > 0 ) {
-			$percentage = round( ( $memory_usage / $memory_limit_bytes ) * 100 );
-			$memory_percentage = $percentage . '%';
-		} else {
-			$memory_percentage = size_format( $memory_usage );
+		// The bar's dot shows the most serious status among the checks.
+		$checks = self::get_hud_status_checks();
+		$level  = 'ok';
+		foreach ( $checks as $check ) {
+			if ( 'danger' === $check['level'] ) {
+				$level = 'danger';
+				break;
+			}
+			if ( 'warning' === $check['level'] ) {
+				$level = 'warning';
+			}
+		}
+		$level_labels = array(
+			'ok'      => __( 'All checks pass', 'server-info' ),
+			'warning' => __( 'Needs attention soon', 'server-info' ),
+			'danger'  => __( 'Critical issue', 'server-info' ),
+		);
+
+		$title  = '<span class="si-hud-env si-hud-env--' . esc_attr( $env_class ) . '">' . esc_html( $env ) . '</span>';
+		$title .= '<span class="si-hud-dot si-hud-dot--' . esc_attr( $level ) . '" aria-hidden="true"></span>';
+		$title .= '<span class="screen-reader-text">' . esc_html( $level_labels[ $level ] ) . '</span>';
+		$title .= '<span class="si-hud-summary">PHP ' . esc_html( $php_version ) . ' | RAM ' . esc_html( $memory_percentage ) . '</span>';
+
+		$server_url = admin_url( 'options-general.php?page=server_info_display' );
+
+		$wp_admin_bar->add_node(
+			array(
+				'id'    => 'si_admin_bar_hud',
+				'title' => $title,
+				'href'  => $server_url,
+				'meta'  => array(
+					'title' => esc_attr__( 'Server Info', 'server-info' ),
+					'class' => 'si-hud',
+				),
+			)
+		);
+
+		if ( ! empty( $checks ) ) {
+			$wp_admin_bar->add_group(
+				array(
+					'id'     => 'si_hud_status',
+					'parent' => 'si_admin_bar_hud',
+					'meta'   => array( 'class' => 'si-hud-group si-hud-group--status' ),
+				)
+			);
+
+			foreach ( $checks as $key => $check ) {
+				$wp_admin_bar->add_node(
+					array(
+						'id'     => 'si_hud_status_' . $key,
+						'parent' => 'si_hud_status',
+						'title'  => '<span class="si-hud-dot si-hud-dot--' . esc_attr( $check['level'] ) . '" aria-hidden="true"></span><span class="si-hud-check si-hud-check--' . esc_attr( $check['level'] ) . '">' . esc_html( $check['text'] ) . '</span>',
+					)
+				);
+			}
 		}
 
-		$badge_html = '<span style="display:inline-block; padding:0 6px; border-radius:3px; background-color:' . esc_attr( $env_color ) . '; color:#fff; font-weight:bold; font-size:11px; text-transform:uppercase; margin-right:8px; line-height:1.6;">' . esc_html( $env ) . '</span>';
-		$title_html = $badge_html . ' PHP ' . esc_html( $php_version ) . ' | RAM ' . esc_html( $memory_percentage );
+		$host      = self::get_site_domain();
+		$server_ip = self::get_server_value( 'SERVER_ADDR' );
+		$is_public = '' !== $server_ip && filter_var( $server_ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE );
+		$public_ip = get_transient( 'si_site_ip_' . md5( $host ) );
 
-		$wp_admin_bar->add_node( array(
-			'id'    => 'si_admin_bar_hud',
-			'title' => $title_html,
-			'href'  => admin_url( 'options-general.php?page=server_info_display' ),
-			'meta'  => array(
-				'title' => esc_attr__( 'Server Info', 'server-info' ),
-			),
-		) );
-
-		$wp_admin_bar->add_node( array(
-			'id'     => 'si_hud_ip',
-			'parent' => 'si_admin_bar_hud',
-				'title'  => esc_html__( 'Server IP: ', 'server-info' ) . esc_html( self::get_server_value( 'SERVER_ADDR', '127.0.0.1' ) ),
-		) );
-
-		$web_server = self::get_server_value( 'SERVER_SOFTWARE', esc_html__( 'Unknown', 'server-info' ) );
+		$web_server = self::get_server_value( 'SERVER_SOFTWARE', __( 'Unknown', 'server-info' ) );
 		if ( strlen( $web_server ) > 30 ) {
 			$web_server = substr( $web_server, 0, 27 ) . '...';
 		}
 
-		$wp_admin_bar->add_node( array(
-			'id'     => 'si_hud_web_server',
-			'parent' => 'si_admin_bar_hud',
-			'title'  => esc_html__( 'Web Server: ', 'server-info' ) . $web_server,
-		) );
-
-		$wp_admin_bar->add_node( array(
-			'id'     => 'si_hud_os',
-			'parent' => 'si_admin_bar_hud',
-			'title'  => esc_html__( 'Operating System: ', 'server-info' ) . PHP_OS,
-		) );
-
-		global $wp_version, $wpdb;
-		$db_version = $wpdb->db_version();
-
-		$wp_admin_bar->add_node( array(
-			'id'     => 'si_hud_db',
-			'parent' => 'si_admin_bar_hud',
-			'title'  => esc_html__( 'Database: ', 'server-info' ) . $db_version,
-		) );
-
-		$wp_admin_bar->add_node( array(
-			'id'     => 'si_hud_wp',
-			'parent' => 'si_admin_bar_hud',
-			'title'  => esc_html__( 'WordPress: ', 'server-info' ) . $wp_version,
-		) );
-
-		$wp_admin_bar->add_node( array(
-			'id'     => 'si_hud_php_limit',
-			'parent' => 'si_admin_bar_hud',
-			'title'  => esc_html__( 'PHP Memory Limit: ', 'server-info' ) . ini_get( 'memory_limit' ),
-		) );
+		$db_info = method_exists( $wpdb, 'db_server_info' ) ? (string) $wpdb->db_server_info() : '';
+		$db_type = false !== stripos( $db_info, 'MariaDB' ) ? 'MariaDB' : 'MySQL';
 
 		$wp_memory_limit = defined( 'WP_MEMORY_LIMIT' ) ? WP_MEMORY_LIMIT : '40M';
-		$wp_admin_bar->add_node( array(
-			'id'     => 'si_hud_wp_limit',
-			'parent' => 'si_admin_bar_hud',
-			'title'  => esc_html__( 'WP Memory Limit: ', 'server-info' ) . $wp_memory_limit,
-		) );
+
+		$sections = array(
+			'site'     => array(
+				'label' => __( 'Site', 'server-info' ),
+				'rows'  => array(
+					array( __( 'Website', 'server-info' ), $host ),
+					array( __( 'Public IP', 'server-info' ), is_string( $public_ip ) ? $public_ip : '' ),
+				),
+			),
+			'server'   => array(
+				'label' => __( 'Server', 'server-info' ),
+				'rows'  => array(
+					/* translators: %s: Internal server IP address. */
+					array( __( 'Server IP', 'server-info' ), '' === $server_ip || $is_public ? $server_ip : sprintf( __( '%s (internal)', 'server-info' ), $server_ip ) ),
+					array( __( 'Web server', 'server-info' ), $web_server ),
+					array( __( 'Operating system', 'server-info' ), PHP_OS_FAMILY ),
+				),
+			),
+			'software' => array(
+				'label' => __( 'Software', 'server-info' ),
+				'rows'  => array(
+					array( __( 'PHP', 'server-info' ), $php_version ),
+					array( __( 'Database', 'server-info' ), $db_type . ' ' . $wpdb->db_version() ),
+					array( __( 'WordPress', 'server-info' ), $wp_version ),
+				),
+			),
+			'memory'   => array(
+				'label' => __( 'Memory', 'server-info' ),
+				'rows'  => array(
+					array( __( 'PHP memory limit', 'server-info' ), $memory_limit_bytes > 0 ? size_format( $memory_limit_bytes ) : __( 'No limit', 'server-info' ) ),
+					array( __( 'WordPress memory limit', 'server-info' ), size_format( wp_convert_hr_to_bytes( $wp_memory_limit ) ) ),
+				),
+			),
+		);
+
+		foreach ( $sections as $section_key => $section ) {
+			$group_id = 'si_hud_' . $section_key;
+			$wp_admin_bar->add_group(
+				array(
+					'id'     => $group_id,
+					'parent' => 'si_admin_bar_hud',
+					'meta'   => array( 'class' => 'si-hud-group' ),
+				)
+			);
+			$wp_admin_bar->add_node(
+				array(
+					'id'     => $group_id . '_heading',
+					'parent' => $group_id,
+					'title'  => '<span class="si-hud-heading">' . esc_html( $section['label'] ) . '</span>',
+				)
+			);
+
+			foreach ( $section['rows'] as $index => $row ) {
+				if ( '' === (string) $row[1] ) {
+					continue;
+				}
+
+				$wp_admin_bar->add_node(
+					array(
+						'id'     => $group_id . '_' . $index,
+						'parent' => $group_id,
+						'title'  => '<span class="si-hud-label">' . esc_html( $row[0] ) . '</span><span class="si-hud-value">' . esc_html( $row[1] ) . '</span>',
+					)
+				);
+			}
+		}
+
+		$wp_admin_bar->add_group(
+			array(
+				'id'     => 'si_hud_footer',
+				'parent' => 'si_admin_bar_hud',
+				'meta'   => array( 'class' => 'si-hud-group' ),
+			)
+		);
+		$wp_admin_bar->add_node(
+			array(
+				'id'     => 'si_hud_open',
+				'parent' => 'si_hud_footer',
+				'title'  => esc_html__( 'Open Server Info', 'server-info' ) . ' &rarr;',
+				'href'   => $server_url,
+			)
+		);
+	}
+
+	/**
+	 * Builds the HUD's status summary from the PHP status and cached SSL and domain checks.
+	 *
+	 * @return array<string, array{level: string, text: string}> Levels: ok, warning, danger or none.
+	 */
+	public static function get_hud_status_checks() {
+		$levels = array(
+			'success' => 'ok',
+			'warning' => 'warning',
+			'danger'  => 'danger',
+		);
+		$checks = array();
+
+		$php           = self::get_php_version_status();
+		$checks['php'] = array(
+			'level' => isset( $levels[ $php['class'] ] ) ? $levels[ $php['class'] ] : 'none',
+			/* translators: 1: PHP version, 2: Status such as "Security update needed". */
+			'text'  => sprintf( __( 'PHP %1$s: %2$s', 'server-info' ), PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '.' . PHP_RELEASE_VERSION, $php['label'] ),
+		);
+
+		$host = self::get_site_domain();
+		if ( ! self::is_public_domain( $host ) ) {
+			return $checks;
+		}
+
+		$ssl = get_transient( 'si_ssl_cert_' . md5( $host ) );
+		if ( is_array( $ssl ) && ! empty( $ssl['available'] ) ) {
+			$parts = array( $ssl['status'], $ssl['issuer'] );
+			if ( null !== $ssl['days_left'] && $ssl['days_left'] >= 0 ) {
+				/* translators: %s: Number of days until the certificate expires. */
+				$parts[] = sprintf( _n( '%s day left', '%s days left', $ssl['days_left'], 'server-info' ), number_format_i18n( $ssl['days_left'] ) );
+			}
+			$checks['ssl'] = array(
+				'level' => isset( $levels[ $ssl['status_key'] ] ) ? $levels[ $ssl['status_key'] ] : 'none',
+				/* translators: %s: Certificate status, issuer and days left. */
+				'text'  => sprintf( __( 'SSL: %s', 'server-info' ), implode( ', ', $parts ) ),
+			);
+		} else {
+			$checks['ssl'] = array(
+				'level' => 'none',
+				'text'  => __( 'SSL: open Server Info to check', 'server-info' ),
+			);
+		}
+
+		if ( self::is_domain_expiry_lookup_enabled() ) {
+			$domain = get_transient( 'si_domain_expiry_' . md5( self::get_registered_domain( $host ) ) );
+			if ( is_array( $domain ) && ! empty( $domain['available'] ) ) {
+				$checks['domain'] = array(
+					'level' => isset( $levels[ $domain['status_key'] ] ) ? $levels[ $domain['status_key'] ] : 'none',
+					'text'  => $domain['days_left'] < 0
+						/* translators: %s: Domain expiry date. */
+						? sprintf( __( 'Domain expired %s', 'server-info' ), $domain['expiry'] )
+						/* translators: 1: Domain expiry date, 2: Days until it expires. */
+						: sprintf( __( 'Domain renews %1$s (%2$s days)', 'server-info' ), $domain['expiry'], number_format_i18n( $domain['days_left'] ) ),
+				);
+			} elseif ( is_array( $domain ) ) {
+				$checks['domain'] = array(
+					'level' => 'none',
+					/* translators: %s: Domain status such as "Not published". */
+					'text'  => sprintf( __( 'Domain expiry: %s', 'server-info' ), $domain['status'] ),
+				);
+			} else {
+				$checks['domain'] = array(
+					'level' => 'none',
+					'text'  => __( 'Domain: open Server Info to check', 'server-info' ),
+				);
+			}
+		}
+
+		return $checks;
+	}
+
+	/**
+	 * Adds the HUD's styles to the admin bar stylesheet, in wp-admin and on the front end.
+	 *
+	 * @return void
+	 */
+	public function enqueue_admin_bar_hud_style() {
+		if ( ! is_admin_bar_showing() || ! current_user_can( 'manage_options' ) || ! self::is_admin_bar_hud_enabled() ) {
+			return;
+		}
+
+		wp_add_inline_style(
+			'admin-bar',
+			'#wpadminbar .si-hud > .ab-item{display:flex!important;align-items:center;gap:8px}'
+			. '#wpadminbar .si-hud-env{display:inline-block;padding:0 6px;border-radius:3px;font-size:11px;font-weight:700;line-height:18px;text-transform:uppercase;color:#fff;background:#d63638}'
+			. '#wpadminbar .si-hud-env--staging{background:#dba617;color:#1d2327}'
+			. '#wpadminbar .si-hud-env--local{background:#00a32a}'
+			. '#wpadminbar .si-hud-dot{display:inline-block;flex-shrink:0;width:8px;height:8px;border-radius:50%;background:#8c8f94}'
+			. '#wpadminbar .si-hud-dot--ok{background:#68de7c}'
+			. '#wpadminbar .si-hud-dot--warning{background:#f2d675}'
+			. '#wpadminbar .si-hud-dot--danger{background:#ff8085}'
+			. '#wpadminbar .si-hud .ab-sub-wrapper{min-width:340px}'
+			. '#wpadminbar .si-hud .si-hud-group{padding:6px 0;border-top:1px solid #3c434a}'
+			. '#wpadminbar .si-hud .si-hud-group--status{padding:8px 0;border-top:0;background:#3c434a}'
+			. '#wpadminbar .si-hud .si-hud-group .ab-item{display:flex!important;align-items:center;gap:8px;height:auto;min-height:26px;line-height:26px}'
+			. '#wpadminbar .si-hud-heading{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#a7aaad}'
+			. '#wpadminbar .si-hud-label{color:#c3c4c7}'
+			. '#wpadminbar .si-hud-value{margin-left:auto;padding-left:24px;color:#f0f0f1}'
+			. '#wpadminbar .si-hud-check{color:#f0f0f1}'
+			. '#wpadminbar .si-hud-check--danger{color:#ffabaf;font-weight:600}'
+			. '#wpadminbar #wp-admin-bar-si_hud_open .ab-item{color:#72aee6;font-weight:600}'
+		);
 	}
 
 	/**
@@ -640,6 +842,60 @@ class Server_Info {
 	}
 
 	/**
+	 * Gets the public IP address the site's hostname resolves to (cached).
+	 *
+	 * Used when SERVER_ADDR is a private or loopback address, which is common behind proxies.
+	 *
+	 * @return string Public IP address, or an empty string.
+	 */
+	public static function get_site_resolved_ip() {
+		$host = self::get_site_domain();
+		if ( ! self::is_public_domain( $host ) ) {
+			return '';
+		}
+
+		$cache_key = 'si_site_ip_' . md5( $host );
+		$cached    = get_transient( $cache_key );
+		if ( false !== $cached ) {
+			return (string) $cached;
+		}
+
+		$resolved = gethostbyname( $host );
+		$ip       = filter_var( $resolved, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE ) ? $resolved : '';
+		set_transient( $cache_key, $ip, 12 * HOUR_IN_SECONDS );
+
+		return $ip;
+	}
+
+	/**
+	 * Gets the number of CPU cores from /proc/cpuinfo or the Windows environment (cached).
+	 *
+	 * @return int Core count, or 0 when it cannot be read.
+	 */
+	public static function get_cpu_core_count() {
+		$cached = get_transient( 'si_cpu_cores' );
+		if ( false !== $cached ) {
+			return (int) $cached;
+		}
+
+		$cores = 0;
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- open_basedir can block this check on shared hosting.
+		if ( @is_readable( '/proc/cpuinfo' ) ) {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents, WordPress.PHP.NoSilencedErrors.Discouraged -- Reads a local system file.
+			$cpuinfo = @file_get_contents( '/proc/cpuinfo' );
+			if ( is_string( $cpuinfo ) ) {
+				$cores = (int) preg_match_all( '/^processor\s*:/m', $cpuinfo );
+			}
+		} elseif ( getenv( 'NUMBER_OF_PROCESSORS' ) ) {
+			$cores = (int) getenv( 'NUMBER_OF_PROCESSORS' );
+		}
+
+		set_transient( 'si_cpu_cores', $cores, DAY_IN_SECONDS );
+
+		return $cores;
+	}
+
+	/**
 	 * Gets the likely registered/root domain for expiry lookups.
 	 *
 	 * @param string $domain Site host or domain.
@@ -692,6 +948,32 @@ class Server_Info {
 			'com.tr',
 			'net.tr',
 			'org.tr',
+			'co.in',
+			'net.in',
+			'org.in',
+			'co.za',
+			'org.za',
+			'com.sg',
+			'com.my',
+			'co.id',
+			'com.hk',
+			'com.tw',
+			'co.kr',
+			'co.il',
+			'com.ar',
+			'com.co',
+			'com.ph',
+			'com.vn',
+			'com.ng',
+			'com.eg',
+			'com.sa',
+			'co.th',
+			'edu.au',
+			'gov.au',
+			'com.ua',
+			'com.pl',
+			'co.at',
+			'or.at',
 		);
 
 		$suffix = implode( '.', array_slice( $parts, -2 ) );
@@ -797,7 +1079,7 @@ class Server_Info {
 			return $default;
 		}
 
-		$issuer    = self::format_certificate_name( isset( $cert['issuer'] ) ? $cert['issuer'] : array() );
+		$issuer    = self::get_friendly_issuer_name( isset( $cert['issuer'] ) ? $cert['issuer'] : array() );
 		$expires   = isset( $cert['validTo_time_t'] ) ? (int) $cert['validTo_time_t'] : 0;
 		$days_left = $expires > 0 ? (int) floor( ( $expires - time() ) / DAY_IN_SECONDS ) : null;
 		$matches   = self::certificate_matches_domain( $cert, $domain );
@@ -904,22 +1186,32 @@ class Server_Info {
 	}
 
 	/**
-	 * Gets best-effort WHOIS domain expiry details.
+	 * Gets best-effort registration expiry details for the site's registrable domain.
 	 *
-	 * @param string $domain Domain name.
+	 * Only the registrable domain (for example example.co.uk for shop.example.co.uk) is sent to
+	 * RDAP or WHOIS services, never the full hostname.
+	 *
+	 * @param string $host Site hostname.
 	 * @return array
 	 */
-	public static function get_domain_expiry_info( $domain ) {
+	public static function get_domain_expiry_info( $host ) {
+		$domain  = self::get_registered_domain( $host );
 		$default = array(
 			'available'  => false,
 			'status'     => esc_html__( 'Unavailable', 'server-info' ),
 			'message'    => esc_html__( 'Domain expiry could not be determined.', 'server-info' ),
+			'note'       => '',
 			'registrar'  => esc_html__( 'Unavailable', 'server-info' ),
 			'domain'     => $domain,
 			'expiry'     => esc_html__( 'Unavailable', 'server-info' ),
 			'days_left'  => null,
 			'status_key' => 'neutral',
 		);
+
+		if ( $domain !== $host && 'www.' . $domain !== $host ) {
+			/* translators: %s: Registrable parent domain. */
+			$default['note'] = sprintf( __( 'Shown for the parent domain %s. If your host provided this subdomain, the registration belongs to the host.', 'server-info' ), $domain );
+		}
 
 		if ( ! self::is_domain_expiry_lookup_enabled() ) {
 			$default['message'] = esc_html__( 'Domain expiry lookup is disabled in Server Info settings.', 'server-info' );
@@ -934,32 +1226,46 @@ class Server_Info {
 		$cache_key = 'si_domain_expiry_' . md5( $domain );
 		$cached    = get_transient( $cache_key );
 		if ( is_array( $cached ) ) {
+			$cached['note'] = $default['note'];
 			return $cached;
 		}
 
-		$parsed = self::query_rdap_domain( $domain );
+		$started = microtime( true );
+		$parsed  = self::query_rdap_domain( $domain );
 
-		if ( empty( $parsed['expiry_timestamp'] ) ) {
-			$whois_server = self::get_whois_server_for_domain( $domain );
-			if ( empty( $whois_server ) ) {
-				$default['message'] = esc_html__( 'No RDAP or WHOIS expiry data is available for this domain extension.', 'server-info' );
-				set_transient( $cache_key, $default, 12 * HOUR_IN_SECONDS );
-				return $default;
+		// WHOIS is only a fallback: skip it when RDAP says the domain is unregistered or the lookup is already slow.
+		if ( empty( $parsed['expiry_timestamp'] ) && empty( $parsed['not_found'] ) && ( microtime( true ) - $started ) < 8 ) {
+			$whois = self::lookup_whois_registration( $domain );
+			if ( ! empty( $whois['expiry_timestamp'] ) || ! empty( $whois['not_found'] ) ) {
+				$parsed = $whois;
+			} else {
+				$parsed['responded'] = ! empty( $parsed['responded'] ) || ! empty( $whois['responded'] );
+				if ( empty( $parsed['registrar'] ) && ! empty( $whois['registrar'] ) ) {
+					$parsed['registrar'] = $whois['registrar'];
+				}
 			}
-
-			$raw_whois = self::query_whois( $whois_server, $domain );
-			if ( empty( $raw_whois ) ) {
-				$default['message'] = esc_html__( 'Domain lookup timed out or returned no data.', 'server-info' );
-				set_transient( $cache_key, $default, 6 * HOUR_IN_SECONDS );
-				return $default;
-			}
-
-			$parsed = self::parse_whois_expiry( $raw_whois );
 		}
 
 		if ( empty( $parsed['expiry_timestamp'] ) ) {
-			$default['message'] = esc_html__( 'Domain lookup did not include a recognizable expiry date.', 'server-info' );
-			set_transient( $cache_key, $default, 12 * HOUR_IN_SECONDS );
+			$ttl = 6 * HOUR_IN_SECONDS;
+			if ( ! empty( $parsed['registrar'] ) ) {
+				$default['registrar'] = $parsed['registrar'];
+			}
+
+			if ( ! empty( $parsed['not_found'] ) ) {
+				/* translators: %s: Registrable domain. */
+				$default['message'] = sprintf( __( 'No registration record was found for %s.', 'server-info' ), $domain );
+				$ttl                = 12 * HOUR_IN_SECONDS;
+			} elseif ( ! empty( $parsed['responded'] ) ) {
+				$default['status'] = esc_html__( 'Not published', 'server-info' );
+				/* translators: %s: Top-level domain, such as de. */
+				$default['message'] = sprintf( __( 'The .%s registry does not publish expiry dates. Check your registrar or hosting account for the renewal date.', 'server-info' ), substr( strrchr( '.' . $domain, '.' ), 1 ) );
+				$ttl                = DAY_IN_SECONDS;
+			} else {
+				$default['message'] = esc_html__( 'The registry lookup timed out or returned no data. Server Info will try again later.', 'server-info' );
+			}
+
+			set_transient( $cache_key, $default, $ttl );
 			return $default;
 		}
 
@@ -982,6 +1288,7 @@ class Server_Info {
 			'available'  => true,
 			'status'     => $status,
 			'message'    => $message,
+			'note'       => $default['note'],
 			'registrar'  => ! empty( $parsed['registrar'] ) ? $parsed['registrar'] : esc_html__( 'Unknown registrar', 'server-info' ),
 			'domain'     => $domain,
 			'expiry'     => date_i18n( get_option( 'date_format' ), $parsed['expiry_timestamp'] ),
@@ -997,64 +1304,53 @@ class Server_Info {
 	/**
 	 * Queries RDAP for domain registration metadata.
 	 *
-	 * @param string $domain Domain name.
-	 * @return array
+	 * The registry's own RDAP server, from the IANA bootstrap file, is asked once. rdap.org is
+	 * used only when the bootstrap file lists no server for the TLD.
+	 *
+	 * @param string $domain Registrable domain.
+	 * @return array{expiry_timestamp: int, registrar: string, responded: bool, not_found: bool}
 	 */
 	public static function query_rdap_domain( $domain ) {
-		$urls = self::get_rdap_urls_for_domain( $domain );
-
-		foreach ( $urls as $url ) {
-			$response = wp_remote_get(
-				$url,
-				array(
-					'timeout'     => 5,
-					'redirection' => 3,
-					'user-agent'  => 'Server Info/' . SERVER_INFO_PLUGIN_VERSION . '; ' . home_url( '/' ),
-				)
-			);
-
-			if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
-				continue;
-			}
-
-			$body = json_decode( wp_remote_retrieve_body( $response ), true );
-			if ( ! is_array( $body ) ) {
-				continue;
-			}
-
-			$parsed = self::parse_rdap_expiry( $body );
-			if ( ! empty( $parsed['expiry_timestamp'] ) ) {
-				return $parsed;
-			}
-		}
-
-		return array();
-	}
-
-	/**
-	 * Gets RDAP endpoint candidates for a domain.
-	 *
-	 * @param string $domain Domain name.
-	 * @return array
-	 */
-	public static function get_rdap_urls_for_domain( $domain ) {
-		$parts = explode( '.', $domain );
-		$tld   = end( $parts );
-
-		$direct = array(
-			'com' => 'https://rdap.verisign.com/com/v1/domain/',
-			'net' => 'https://rdap.verisign.com/net/v1/domain/',
-			'org' => 'https://rdap.publicinterestregistry.org/rdap/domain/',
+		$result = array(
+			'expiry_timestamp' => 0,
+			'registrar'        => '',
+			'responded'        => false,
+			'not_found'        => false,
 		);
 
-		$urls = array();
-		if ( isset( $direct[ $tld ] ) ) {
-			$urls[] = $direct[ $tld ] . rawurlencode( $domain );
+		$base = self::get_iana_rdap_base_url( substr( strrchr( '.' . $domain, '.' ), 1 ) );
+		$url  = ( $base ? $base : 'https://rdap.org/' ) . 'domain/' . rawurlencode( $domain );
+
+		$response = wp_remote_get(
+			$url,
+			array(
+				'timeout'     => 5,
+				'redirection' => 3,
+				'user-agent'  => 'Server Info/' . SERVER_INFO_PLUGIN_VERSION . '; ' . home_url( '/' ),
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return $result;
 		}
 
-		$urls[] = 'https://rdap.org/domain/' . rawurlencode( $domain );
+		$code = (int) wp_remote_retrieve_response_code( $response );
+		if ( 404 === $code ) {
+			// Only the registry's own server is authoritative about unregistered domains.
+			$result['not_found'] = (bool) $base;
+			return $result;
+		}
 
-		return $urls;
+		if ( 200 !== $code ) {
+			return $result;
+		}
+
+		$body = json_decode( wp_remote_retrieve_body( $response ), true );
+		if ( ! is_array( $body ) ) {
+			return $result;
+		}
+
+		return array_merge( $result, self::parse_rdap_expiry( $body ), array( 'responded' => true ) );
 	}
 
 	/**
@@ -1123,6 +1419,138 @@ class Server_Info {
 	}
 
 	/**
+	 * Looks up a domain's expiry and registrar over WHOIS only.
+	 *
+	 * @param string $domain Registrable domain.
+	 * @return array{expiry_timestamp: int, registrar: string, responded: bool, not_found: bool}
+	 */
+	public static function lookup_whois_registration( $domain ) {
+		$result = array(
+			'expiry_timestamp' => 0,
+			'registrar'        => '',
+			'responded'        => false,
+			'not_found'        => false,
+		);
+
+		$whois_server = self::get_whois_server_for_domain( $domain );
+		if ( empty( $whois_server ) ) {
+			return $result;
+		}
+
+		$raw_whois = self::query_whois( $whois_server, $domain );
+		if ( '' === trim( $raw_whois ) || preg_match( '/limit exceeded|too many (queries|requests)|quota exceeded/i', $raw_whois ) ) {
+			return $result;
+		}
+
+		$result['responded'] = true;
+
+		if ( preg_match( '/^\s*(no match|not found|no entries found|no data found|domain not found)|^\s*status:\s*free\b/mi', $raw_whois ) ) {
+			$result['not_found'] = true;
+			return $result;
+		}
+
+		return array_merge( $result, self::parse_whois_expiry( $raw_whois ) );
+	}
+
+	/**
+	 * Gets the RDAP base URL for a TLD from the IANA bootstrap registry (cached).
+	 *
+	 * @param string $tld Top-level domain without a leading dot.
+	 * @return string Base URL ending in a slash, or an empty string.
+	 */
+	public static function get_iana_rdap_base_url( $tld ) {
+		$map = get_transient( 'si_rdap_bootstrap' );
+
+		if ( ! is_array( $map ) ) {
+			$map      = array();
+			$response = wp_remote_get( 'https://data.iana.org/rdap/dns.json', array( 'timeout' => 5 ) );
+
+			if ( ! is_wp_error( $response ) && 200 === wp_remote_retrieve_response_code( $response ) ) {
+				$data = json_decode( wp_remote_retrieve_body( $response ), true );
+				if ( ! empty( $data['services'] ) && is_array( $data['services'] ) ) {
+					foreach ( $data['services'] as $service ) {
+						if ( empty( $service[0] ) || empty( $service[1] ) || ! is_array( $service[0] ) || ! is_array( $service[1] ) ) {
+							continue;
+						}
+						foreach ( $service[0] as $service_tld ) {
+							$map[ strtolower( $service_tld ) ] = rtrim( (string) $service[1][0], '/' ) . '/';
+						}
+					}
+				}
+			}
+
+			// Retry a failed download after an hour instead of a week.
+			set_transient( 'si_rdap_bootstrap', $map, empty( $map ) ? HOUR_IN_SECONDS : 7 * DAY_IN_SECONDS );
+		}
+
+		return isset( $map[ $tld ] ) ? $map[ $tld ] : '';
+	}
+
+	/**
+	 * Gets the WHOIS server for a TLD via IANA's referral (cached).
+	 *
+	 * @param string $tld Top-level domain without a leading dot.
+	 * @return string
+	 */
+	public static function get_iana_whois_server( $tld ) {
+		$cache_key = 'si_whois_server_' . md5( $tld );
+		$server    = get_transient( $cache_key );
+
+		if ( false === $server ) {
+			$server   = '';
+			$response = self::query_whois( 'whois.iana.org', $tld );
+			// IANA answers TLD queries with a "whois:" field; "refer:" appears in domain queries.
+			if ( preg_match( '/^(?:whois|refer):\s*(\S+)/mi', $response, $matches ) ) {
+				$server = sanitize_text_field( $matches[1] );
+			}
+			set_transient( $cache_key, $server, 7 * DAY_IN_SECONDS );
+		}
+
+		return (string) $server;
+	}
+
+	/**
+	 * Returns a friendly certificate authority name, such as "Let's Encrypt" instead of "R11".
+	 *
+	 * @param array $parts Certificate issuer parts.
+	 * @return string
+	 */
+	public static function get_friendly_issuer_name( $parts ) {
+		if ( ! is_array( $parts ) || empty( $parts ) ) {
+			return '';
+		}
+
+		$haystack = '';
+		foreach ( array( 'O', 'CN' ) as $key ) {
+			if ( ! empty( $parts[ $key ] ) ) {
+				$haystack .= ' ' . ( is_array( $parts[ $key ] ) ? implode( ' ', $parts[ $key ] ) : $parts[ $key ] );
+			}
+		}
+
+		$known = array(
+			'/let\'?s\s*encrypt/i'     => "Let's Encrypt",
+			'/zerossl/i'               => 'ZeroSSL',
+			'/sectigo|comodo/i'        => 'Sectigo',
+			'/digicert/i'              => 'DigiCert',
+			'/google trust services/i' => 'Google Trust Services',
+			'/globalsign/i'            => 'GlobalSign',
+			'/cloudflare/i'            => 'Cloudflare',
+			'/amazon/i'                => 'Amazon',
+			'/buypass/i'               => 'Buypass',
+			'/actalis/i'               => 'Actalis',
+			'/ssl\.com/i'              => 'SSL.com',
+		);
+
+		foreach ( $known as $pattern => $label ) {
+			if ( preg_match( $pattern, $haystack ) ) {
+				return $label;
+			}
+		}
+
+		return self::format_certificate_name( $parts );
+	}
+
+	/**
 	 * Maps common TLDs to WHOIS servers.
 	 *
 	 * @param string $domain Domain name.
@@ -1151,7 +1579,11 @@ class Server_Info {
 			'pk' => 'whois.pknic.net.pk',
 		);
 
-		return isset( $servers[ $tld ] ) ? $servers[ $tld ] : '';
+		if ( isset( $servers[ $tld ] ) ) {
+			return $servers[ $tld ];
+		}
+
+		return self::get_iana_whois_server( $tld );
 	}
 
 	/**
@@ -1178,7 +1610,13 @@ class Server_Info {
 
 		$response = '';
 		while ( ! feof( $connection ) ) {
-			$response .= fgets( $connection, 1024 );
+			// fgets() returns false on a read timeout, while feof() can stay false; stop instead of spinning.
+			$line = fgets( $connection, 1024 );
+			if ( false === $line ) {
+				break;
+			}
+
+			$response .= $line;
 			if ( strlen( $response ) > 20000 ) {
 				break;
 			}
@@ -1357,9 +1795,20 @@ class Server_Info {
 
 		$server_ip = self::get_server_value( 'SERVER_ADDR' );
 		if ( '' !== $server_ip ) {
+			$server_ip_value = $server_ip;
+
+			// Behind a proxy or container SERVER_ADDR is internal, so also show what the site name resolves to.
+			if ( ! filter_var( $server_ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE ) ) {
+				$resolved_ip = self::get_site_resolved_ip();
+				if ( '' !== $resolved_ip && $resolved_ip !== $server_ip ) {
+					/* translators: 1: Internal server address, 2: Address the site hostname resolves to. */
+					$server_ip_value = sprintf( __( '%1$s (internal), site resolves to %2$s', 'server-info' ), $server_ip, $resolved_ip );
+				}
+			}
+
 			$info['wp-server']['fields']['server_ip'] = array(
 				'label' => esc_html__( 'Server IP', 'server-info' ),
-				'value' => $server_ip,
+				'value' => $server_ip_value,
 			);
 		}
 
@@ -1808,6 +2257,314 @@ class Server_Info {
 	}
 
 	/**
+	 * Flags the "find Server Info here" menu pointer to show after activation.
+	 *
+	 * @since 1.1.1
+	 * @access public
+	 *
+	 * @return void
+	 */
+	public static function on_activation() {
+		update_option( 'server_info_menu_pointer', 1, false );
+	}
+
+	/**
+	 * Shows a WordPress pointer next to Settings > Server Info after activation.
+	 *
+	 * Each administrator sees it until they dismiss it; WordPress stores the dismissal per user.
+	 *
+	 * @since 1.1.1
+	 * @access public
+	 *
+	 * @return void
+	 */
+	public function enqueue_menu_pointer() {
+		$pointer_id = 'server_info_menu';
+
+		if ( ! get_option( 'server_info_menu_pointer' ) || ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$dismissed = array_filter( explode( ',', (string) get_user_meta( get_current_user_id(), 'dismissed_wp_pointers', true ) ) );
+		if ( in_array( $pointer_id, $dismissed, true ) ) {
+			return;
+		}
+
+		$content  = '<h3>' . esc_html__( 'Server Info is ready', 'server-info' ) . '</h3>';
+		$content .= '<p>' . esc_html__( 'Check server health, PHP, database, SSL and diagnostics anytime under Settings → Server Info.', 'server-info' ) . '</p>';
+		$content .= '<p><a class="button button-primary" href="' . esc_url( admin_url( 'options-general.php?page=server_info_display' ) ) . '">' . esc_html__( 'Open Server Info', 'server-info' ) . '</a></p>';
+
+		wp_enqueue_style( 'wp-pointer' );
+		wp_enqueue_script( 'wp-pointer' );
+		wp_add_inline_script(
+			'wp-pointer',
+			'jQuery( function ( $ ) {
+				// Point at the Server Info submenu item when Settings is the open menu, otherwise at Settings itself.
+				// Closed submenus are moved off-screen rather than hidden, so ":visible" cannot tell them apart.
+				var $item = $( "#menu-settings.wp-has-current-submenu a[href$=\'page=server_info_display\']" );
+				var $target = $item.length ? $item : $( "#menu-settings" );
+				if ( ! $target.length || ! $.fn.pointer ) {
+					return;
+				}
+				$target.pointer( {
+					content: ' . wp_json_encode( $content ) . ',
+					position: { edge: ' . wp_json_encode( is_rtl() ? 'right' : 'left' ) . ', align: "center" },
+					close: function () {
+						$.post( ajaxurl, { pointer: ' . wp_json_encode( $pointer_id ) . ', action: "dismiss-wp-pointer" } );
+					}
+				} ).pointer( "open" );
+			} );'
+		);
+	}
+
+	/**
+	 * Shows the PHP2Shell warning as a standard admin notice on every dashboard screen.
+	 *
+	 * The notice stays until PHP is updated, or until an administrator confirms that the host
+	 * installed a patched build for this exact PHP version. Linux distributions and LTS vendors
+	 * often backport fixes without changing the upstream version number.
+	 *
+	 * @since 1.1.1
+	 * @access public
+	 *
+	 * @return void
+	 */
+	public function render_php_security_notice() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$php_security = self::get_php_security_status();
+		if ( ! $php_security['vulnerable'] ) {
+			return;
+		}
+
+		/**
+		 * Filters the guide URL linked from the PHP2Shell admin notice.
+		 *
+		 * @since 1.1.1
+		 *
+		 * @param string $url Guide URL. Defaults to the PHP project's security advisory.
+		 */
+		$guide_url   = apply_filters( 'server_info_php_security_guide_url', 'https://www.php.net/archive/2026.php#2026-10-21-5' );
+		$ack_url     = wp_nonce_url( admin_url( 'admin-post.php?action=server_info_php2shell_ack' ), 'server_info_php2shell_ack' );
+		$ack_confirm = __( 'Only continue if your host has confirmed that this PHP build includes the fixes for CVE-2026-109618 and CVE-2026-109619. The notice returns if the PHP version changes.', 'server-info' );
+		$uncertain   = $php_security['branch_eol'] || $php_security['vendor_build'];
+		?>
+		<div class="notice notice-error si-php-notice">
+			<style>
+				.notice.si-php-notice { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; padding: 14px 18px 16px; }
+				.si-php-notice__main { flex: 1 1 360px; min-width: 0; }
+				.si-php-notice__main p, .si-php-notice__aside p { margin: 0 0 6px; }
+				.si-php-notice__main p:last-child { margin-bottom: 0; }
+				.si-php-notice__brand { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #8c2020; }
+				.si-php-notice__brand .dashicons { width: 14px; height: 14px; font-size: 14px; }
+				.si-php-notice__title { font-size: 15px; line-height: 1.4; color: #1d2327; }
+				.si-php-notice__ack { font-size: 12px; color: #50575e; }
+				.notice.si-php-notice .si-php-notice__aside { flex: 0 1 280px; display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border: 1px solid rgba(185, 28, 28, .14); border-radius: 8px; background: rgba(255, 255, 255, .8); }
+				.si-php-notice__aside-title { margin: 0; font-size: 13px; font-weight: 600; color: #1d2327; }
+				.si-php-notice__aside-text { margin: 0 !important; font-size: 12px; line-height: 1.5; color: #50575e; }
+				.notice.si-php-notice .si-php-notice__btn,
+				.notice.si-php-notice .si-php-notice__btn:link,
+				.notice.si-php-notice .si-php-notice__btn:visited { display: flex; align-items: center; justify-content: flex-start; gap: 8px; height: 34px; padding: 0 12px; border: 1px solid #dcdcde; border-radius: 6px; background: #fff; color: #1d2327 !important; font-size: 13px; font-weight: 500; line-height: 1; text-decoration: none !important; box-shadow: 0 1px 0 rgba(0, 0, 0, .04); }
+				.notice.si-php-notice .si-php-notice__btn:hover,
+				.notice.si-php-notice .si-php-notice__btn:focus { border-color: #2271b1; color: #2271b1 !important; }
+				.si-php-notice__btn .dashicons { width: 16px; height: 16px; font-size: 16px; }
+				.si-php-notice__btn--star .dashicons { color: #dba617; }
+				.si-php-notice__btn--support .dashicons { color: #d63638; }
+				@media screen and (max-width: 782px) {
+					.notice.si-php-notice .si-php-notice__aside { flex-basis: 100%; }
+				}
+			</style>
+			<div class="si-php-notice__main">
+				<p class="si-php-notice__brand"><span class="dashicons dashicons-networking"></span> <?php esc_html_e( 'Server Info', 'server-info' ); ?></p>
+				<p class="si-php-notice__title">
+					<strong>
+						<?php if ( $uncertain ) : ?>
+							<?php esc_html_e( 'Security check needed: confirm that this server\'s PHP includes the PHP2Shell fix', 'server-info' ); ?>
+						<?php else : ?>
+							<?php esc_html_e( 'Critical: this server\'s PHP version is affected by remote code execution flaws (PHP2Shell)', 'server-info' ); ?>
+						<?php endif; ?>
+					</strong>
+				</p>
+				<p>
+					<?php
+					printf(
+						/* translators: %s: current PHP version. */
+						esc_html__( 'PHP %s is in the range affected by CVE-2026-109618 and CVE-2026-109619, which can let unauthenticated attackers run code on the server.', 'server-info' ),
+						esc_html( $php_security['version'] )
+					);
+					?>
+				</p>
+				<p>
+					<?php if ( $php_security['branch_eol'] ) : ?>
+						<?php
+						printf(
+							/* translators: %s: PHP branch, such as 8.1. */
+							esc_html__( 'PHP %s no longer receives fixes from the PHP project. Upgrade to a supported PHP version, or ask your host to confirm that a vendor backport is installed.', 'server-info' ),
+							esc_html( $php_security['branch'] )
+						);
+						?>
+					<?php else : ?>
+						<?php
+						printf(
+							/* translators: %s: first patched PHP release for this branch. */
+							esc_html__( 'Update PHP to %s or later, or ask your host to do it.', 'server-info' ),
+							esc_html( $php_security['fixed_in'] )
+						);
+						?>
+						<?php if ( $php_security['vendor_build'] ) : ?>
+							<?php esc_html_e( 'This PHP build comes from an operating system vendor, which may include the fix without changing the version number. Your host can confirm.', 'server-info' ); ?>
+						<?php endif; ?>
+					<?php endif; ?>
+					<a href="<?php echo esc_url( $guide_url ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Read more about PHP2Shell', 'server-info' ); ?> &rarr;</a>
+				</p>
+				<p class="si-php-notice__ack">
+					<a href="<?php echo esc_url( $ack_url ); ?>" onclick="<?php echo esc_attr( 'return window.confirm(' . wp_json_encode( $ack_confirm ) . ');' ); ?>"><?php esc_html_e( 'My host confirmed this server is patched', 'server-info' ); ?></a>
+					&middot;
+					<?php esc_html_e( 'Hides this notice until the PHP version changes.', 'server-info' ); ?>
+				</p>
+			</div>
+			<div class="si-php-notice__aside">
+				<p class="si-php-notice__aside-title"><?php esc_html_e( 'Find this notice useful?', 'server-info' ); ?></p>
+				<p class="si-php-notice__aside-text"><?php esc_html_e( 'A quick rating helps other site owners find Server Info. Support keeps it free and maintained.', 'server-info' ); ?></p>
+				<a class="si-php-notice__btn si-php-notice__btn--star" href="https://wordpress.org/support/plugin/server-info/reviews/#new-post" target="_blank" rel="noopener noreferrer"><span class="dashicons dashicons-star-filled"></span> <?php esc_html_e( 'Rate Server Info', 'server-info' ); ?></a>
+				<a class="si-php-notice__btn si-php-notice__btn--support" href="<?php echo esc_url( admin_url( 'options-general.php?page=server_info_display&tab=support' ) ); ?>"><span class="dashicons dashicons-heart"></span> <?php esc_html_e( 'Support development', 'server-info' ); ?></a>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Records, or clears, an administrator's confirmation that the host patched PHP2Shell
+	 * for the current PHP version.
+	 *
+	 * @since 1.1.1
+	 * @access public
+	 *
+	 * @return void
+	 */
+	public function handle_php_security_ack() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Sorry, you are not allowed to do that.', 'server-info' ), '', array( 'response' => 403 ) );
+		}
+
+		check_admin_referer( 'server_info_php2shell_ack' );
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- The nonce is verified above.
+		if ( ! empty( $_GET['undo'] ) ) {
+			delete_option( SERVER_INFO_PHP_ACK_OPTION );
+		} else {
+			update_option( SERVER_INFO_PHP_ACK_OPTION, PHP_VERSION, false );
+		}
+
+		$redirect = wp_get_referer();
+		wp_safe_redirect( $redirect ? $redirect : admin_url() );
+		exit;
+	}
+
+	/**
+	 * Checks whether a PHP version is in the range affected by PHP2Shell (CVE-2026-109618 / CVE-2026-109619).
+	 *
+	 * Fixed releases: PHP 8.5.12, 8.4.27, 8.3.36 and 8.2.35. PHP 8.1 and older receive no upstream fix.
+	 * Branches newer than 8.5 are not listed, so they are not flagged. Distribution builds can carry
+	 * backported fixes without a version bump, so those are reported as needing confirmation.
+	 *
+	 * @since 1.1.1
+	 * @access public
+	 *
+	 * @param string $version PHP version string. Defaults to the running version.
+	 * @return array
+	 */
+	public static function get_php_security_status( $version = PHP_VERSION ) {
+		$fixed_in = array(
+			'8.5' => '8.5.12',
+			'8.4' => '8.4.27',
+			'8.3' => '8.3.36',
+			'8.2' => '8.2.35',
+		);
+		$status   = array(
+			'affected'     => false,
+			'vulnerable'   => false,
+			'acknowledged' => false,
+			'version'      => (string) $version,
+			'branch'       => '',
+			'fixed_in'     => '',
+			'branch_eol'   => false,
+			'vendor_build' => false,
+		);
+
+		if ( ! preg_match( '/^(\d+)\.(\d+)\.(\d+)(.*)$/', (string) $version, $parts ) ) {
+			return $status;
+		}
+
+		$base             = $parts[1] . '.' . $parts[2] . '.' . $parts[3];
+		$status['branch'] = $parts[1] . '.' . $parts[2];
+
+		// A suffix such as "-0ubuntu0.24.04.5" marks a vendor build; "-dev" or "RC1" do not.
+		$status['vendor_build'] = '' !== $parts[4] && ! preg_match( '/^-?(dev|alpha|beta|rc)/i', $parts[4] );
+
+		if ( version_compare( $base, '8.2.0', '<' ) ) {
+			$status['affected']   = true;
+			$status['branch_eol'] = true;
+		} elseif ( isset( $fixed_in[ $status['branch'] ] ) ) {
+			$status['fixed_in'] = $fixed_in[ $status['branch'] ];
+			$status['affected'] = version_compare( $base, $status['fixed_in'], '<' );
+		}
+
+		$status['acknowledged'] = $status['affected'] && get_option( SERVER_INFO_PHP_ACK_OPTION ) === $status['version'];
+		$status['vulnerable']   = $status['affected'] && ! $status['acknowledged'];
+
+		return $status;
+	}
+
+	/**
+	 * Gets the PHP version status shown on the Overview and Diagnostics screens.
+	 *
+	 * @since 1.1.1
+	 * @access public
+	 *
+	 * @return array{label: string, class: string, penalty: int, reason: string}
+	 */
+	public static function get_php_version_status() {
+		$version = PHP_VERSION;
+
+		if ( self::get_php_security_status()['vulnerable'] ) {
+			return array(
+				'label'   => esc_html__( 'Security update needed', 'server-info' ),
+				'class'   => 'danger',
+				'penalty' => 40,
+				'reason'  => "Critical: PHP $version is affected by PHP2Shell (CVE-2026-109618, CVE-2026-109619).",
+			);
+		}
+
+		if ( version_compare( $version, '7.4', '<' ) ) {
+			return array(
+				'label'   => esc_html__( 'Critical', 'server-info' ),
+				'class'   => 'danger',
+				'penalty' => 30,
+				'reason'  => "Critical: PHP version is very outdated ($version).",
+			);
+		}
+
+		if ( version_compare( $version, '8.3', '<' ) ) {
+			return array(
+				'label'   => esc_html__( 'Update recommended', 'server-info' ),
+				'class'   => 'warning',
+				'penalty' => 10,
+				'reason'  => "Warning: PHP version ($version) is below recommended 8.3.",
+			);
+		}
+
+		return array(
+			'label'   => esc_html__( 'Supported', 'server-info' ),
+			'class'   => 'success',
+			'penalty' => 0,
+			'reason'  => '',
+		);
+	}
+
+	/**
 	 * Renders the main plugin settings page with tabs.
 	 *
 	 * @since 0.0.1
@@ -1887,11 +2644,26 @@ class Server_Info {
 		// CPU Load
 		$cpu_load = 'N/A';
 		$cpu_pct = 0;
+		$cpu_cores  = self::get_cpu_core_count();
+		$cpu_rating = '';
 		if ( function_exists('sys_getloadavg') ) {
 			$load = sys_getloadavg();
 			if ( is_array($load) ) {
 				$cpu_load = round($load[0], 2);
-				$cpu_pct = min(100, round(($load[0] / 4) * 100)); // Rough estimate
+				if ( $cpu_cores > 0 ) {
+					// Load average relative to the core count: below 0.7 per core is comfortable, above 1 is saturated.
+					$load_per_core = $load[0] / $cpu_cores;
+					$cpu_pct       = min( 100, round( $load_per_core * 100 ) );
+					if ( $load_per_core < 0.7 ) {
+						$cpu_rating = esc_html__( 'Excellent', 'server-info' );
+					} elseif ( $load_per_core < 1 ) {
+						$cpu_rating = esc_html__( 'OK', 'server-info' );
+					} else {
+						$cpu_rating = esc_html__( 'High', 'server-info' );
+					}
+				} else {
+					$cpu_pct = min(100, round(($load[0] / 4) * 100)); // Rough estimate without a core count
+				}
 			}
 		}
 		
@@ -1899,45 +2671,45 @@ class Server_Info {
 		$mem_used_bytes = memory_get_usage(true);
 		$mem_limit_str = ini_get('memory_limit');
 		$mem_limit_bytes = wp_convert_hr_to_bytes($mem_limit_str);
+		$mem_limit_label = $mem_limit_bytes > 0 ? size_format( $mem_limit_bytes ) : esc_html__( 'no limit', 'server-info' );
+		/* translators: 1: Memory used by this request, 2: PHP memory limit. */
+		$mem_caption     = sprintf( esc_html__( '%1$s of %2$s', 'server-info' ), size_format( $mem_used_bytes, 1 ), $mem_limit_label );
+		/* translators: %s: PHP memory limit. */
+		$mem_kpi_caption = $mem_limit_bytes > 0 ? sprintf( __( 'of %s limit', 'server-info' ), $mem_limit_label ) : __( 'No memory limit', 'server-info' );
 		if ( $mem_limit_bytes <= 0 ) {
 			$mem_limit_bytes = $mem_used_bytes; 
 		}
 		$mem_pct = min(100, round(($mem_used_bytes / $mem_limit_bytes) * 100));
 		
 		// Disk Space
-		$disk_pct = 0;
+		$disk_pct     = 0;
+		$disk_caption = '';
 		if ( function_exists('disk_total_space') && function_exists('disk_free_space') ) {
 			$disk_total = @disk_total_space( ABSPATH );
 			$disk_free = @disk_free_space( ABSPATH );
 			if ( $disk_total > 0 ) {
 				$disk_used = $disk_total - $disk_free;
 				$disk_pct = min(100, round(($disk_used / $disk_total) * 100));
+				/* translators: 1: Used disk space, 2: Total disk space. */
+				$disk_caption = sprintf( esc_html__( '%1$s of %2$s', 'server-info' ), size_format( $disk_used, 1 ), size_format( $disk_total, 1 ) );
 			}
 		}
 
 		$site_domain        = self::get_site_domain();
-		$registered_domain  = self::get_registered_domain( $site_domain );
 		$ssl_info           = self::get_ssl_certificate_info( $site_domain );
-		$domain_info        = self::get_domain_expiry_info( $registered_domain );
+		$domain_info        = self::get_domain_expiry_info( $site_domain );
 
 		// Calculate Overall Health Score
 		$health_score = 100;
 		$health_reasons = array();
 		
 		// PHP Version check
-		$php_v = phpversion();
-		$php_status_label = esc_html__( 'Latest', 'server-info' );
-		$php_status_class = 'success';
-		if ( version_compare( $php_v, '7.4', '<' ) ) {
-			$health_score -= 30;
-			$health_reasons[] = "Critical: PHP version is very outdated ($php_v).";
-			$php_status_label = esc_html__( 'Critical', 'server-info' );
-			$php_status_class = 'neutral';
-		} elseif ( version_compare( $php_v, '8.3', '<' ) ) {
-			$health_score -= 10;
-			$health_reasons[] = "Warning: PHP version ($php_v) is below recommended 8.3.";
-			$php_status_label = esc_html__( 'Update recommended', 'server-info' );
-			$php_status_class = 'neutral';
+		$php_status       = self::get_php_version_status();
+		$php_status_label = $php_status['label'];
+		$php_status_class = $php_status['class'];
+		if ( $php_status['penalty'] > 0 ) {
+			$health_score    -= $php_status['penalty'];
+			$health_reasons[] = $php_status['reason'];
 		}
 
 		// Memory Limit Check
@@ -2012,12 +2784,13 @@ class Server_Info {
 			$health_status = 'Fair';
 			$health_color = '#f59e0b'; // Amber
 			$health_bg = '#fef3c7';
-			$health_msg = 'Needs attention: ' . (isset($health_reasons[0]) ? $health_reasons[0] : 'Suboptimal settings.');
+			// Reasons already start with "Warning:", "Security:" or "Critical:".
+			$health_msg = isset( $health_reasons[0] ) ? $health_reasons[0] : 'Needs attention: Suboptimal settings.';
 		} else {
 			$health_status = 'Critical';
 			$health_color = '#ef4444'; // Red
 			$health_bg = '#fee2e2';
-			$health_msg = 'Urgent: ' . (isset($health_reasons[0]) ? $health_reasons[0] : 'Multiple severe issues.');
+			$health_msg = isset( $health_reasons[0] ) ? $health_reasons[0] : 'Urgent: Multiple severe issues.';
 		}
 		?>
 		<div class="wrap"><h1 style="display:none;"></h1></div>
@@ -2133,7 +2906,7 @@ class Server_Info {
 						<div class="si-kpi-content">
 							<div class="si-kpi-label">Memory Usage</div>
 							<div class="si-kpi-value"><?php echo esc_html($memory_usage); ?></div>
-							<div class="si-kpi-status neutral">Used / Limit</div>
+							<div class="si-kpi-status neutral"><?php echo esc_html( $mem_kpi_caption ); ?></div>
 						</div>
 					</div>
 					<div class="si-kpi-card status-excellent">
@@ -2209,6 +2982,9 @@ class Server_Info {
 									</strong>
 								</li>
 							</ul>
+							<?php if ( empty( $ssl_info['available'] ) || 'success' !== $ssl_info['status_key'] ) : ?>
+								<p class="si-check-note"><?php echo esc_html( $ssl_info['message'] ); ?></p>
+							<?php endif; ?>
 						</div>
 
 						<div class="si-basic-card si-check-card <?php echo esc_attr( 'status-' . $domain_info['status_key'] ); ?>">
@@ -2238,6 +3014,12 @@ class Server_Info {
 									</strong>
 								</li>
 							</ul>
+							<?php if ( empty( $domain_info['available'] ) || 'success' !== $domain_info['status_key'] ) : ?>
+								<p class="si-check-note"><?php echo esc_html( $domain_info['message'] ); ?></p>
+							<?php endif; ?>
+							<?php if ( ! empty( $domain_info['note'] ) ) : ?>
+								<p class="si-check-note"><?php echo esc_html( $domain_info['note'] ); ?></p>
+							<?php endif; ?>
 						</div>
 					</div>
 				</div>
@@ -2259,6 +3041,16 @@ class Server_Info {
 									<div class="si-circle-label">Load</div>
 								</div>
 								<div class="si-circle-title">CPU Load</div>
+								<div class="si-circle-sub">
+									<?php
+									if ( $cpu_cores > 0 && '' !== $cpu_rating ) {
+										/* translators: 1: Number of CPU cores, 2: Load rating such as Excellent. */
+										printf( esc_html( _n( '%1$s core · %2$s', '%1$s cores · %2$s', $cpu_cores, 'server-info' ) ), esc_html( number_format_i18n( $cpu_cores ) ), esc_html( $cpu_rating ) );
+									} else {
+										esc_html_e( 'Load average', 'server-info' );
+									}
+									?>
+								</div>
 							</div>
 							<div class="si-circle-wrapper">
 								<div class="si-circle-chart">
@@ -2270,6 +3062,7 @@ class Server_Info {
 									<div class="si-circle-label">Used</div>
 								</div>
 								<div class="si-circle-title">Memory</div>
+								<div class="si-circle-sub"><?php echo esc_html( $mem_caption ); ?></div>
 							</div>
 							<div class="si-circle-wrapper">
 								<div class="si-circle-chart">
@@ -2281,6 +3074,9 @@ class Server_Info {
 									<div class="si-circle-label">Used</div>
 								</div>
 								<div class="si-circle-title">Disk Space</div>
+								<?php if ( '' !== $disk_caption ) : ?>
+									<div class="si-circle-sub"><?php echo esc_html( $disk_caption ); ?></div>
+								<?php endif; ?>
 							</div>
 						</div>
 						<div class="si-memory-bars">
@@ -2513,6 +3309,20 @@ class Server_Info {
 				'slug' => 'fusion-pricing-tables',
 				'file' => 'fusion-pricing-tables/pricing-grid.php',
 			),
+			array(
+				'name' => esc_html__( 'FactorGuard - Two-Factor Authentication', 'server-info' ),
+				'desc' => esc_html__( 'Protect your WordPress login with two-factor authentication using email codes or authenticator apps.', 'server-info' ),
+				'icon' => 'dashicons-shield',
+				'slug' => 'factorguard',
+				'file' => 'factorguard/factorguard.php',
+			),
+			array(
+				'name' => esc_html__( 'Quick and Easy FAQs', 'server-info' ),
+				'desc' => esc_html__( 'Add FAQs to your site quickly, with grouping, filtering, and accordion or toggle layouts.', 'server-info' ),
+				'icon' => 'dashicons-editor-help',
+				'slug' => 'quick-and-easy-faqs',
+				'file' => 'quick-and-easy-faqs/quick-and-easy-faqs.php',
+			),
 		);
 		?>
 		<div class="si-dashboard-grid si-plugins-grid">
@@ -2659,6 +3469,10 @@ class Server_Info {
 						<span class="dashicons dashicons-sos"></span> <?php esc_html_e( 'Get Support', 'server-info' ); ?>
 					</a>
 				</div>
+				<p class="si-support-trust">
+					<span class="dashicons dashicons-lock" aria-hidden="true"></span>
+					<span><?php esc_html_e( 'Payments open in Freemius\'s secure checkout. Your card details are entered there and never pass through or get stored on this WordPress site.', 'server-info' ); ?></span>
+				</p>
 			</div>
 
 			<div class="si-section">
@@ -2677,16 +3491,16 @@ class Server_Info {
 	}
 
 	/**
-	 * Displays the floating supporter checkout launcher.
+	 * Displays the floating supporter checkout launcher and its panel.
 	 *
 	 * @return void
 	 */
 	public static function display_support_floating_checkout() {
 		$plans = self::get_support_plans();
 		?>
-		<button type="button" class="si-floating-support-button" data-server-info-support-open>
-			<span class="dashicons dashicons-heart"></span>
-			<span><?php esc_html_e( 'Support', 'server-info' ); ?></span>
+		<button type="button" class="si-floating-support-button" data-server-info-support-open aria-label="<?php esc_attr_e( 'Support Server Info', 'server-info' ); ?>">
+			<span class="dashicons dashicons-heart" aria-hidden="true"></span>
+			<span class="si-floating-support-label"><?php esc_html_e( 'Support', 'server-info' ); ?></span>
 		</button>
 
 		<div id="server-info-support-panel" class="si-support-panel" hidden aria-hidden="true">
@@ -2789,19 +3603,17 @@ class Server_Info {
 	 *
 	 * @return void
 	 */
-	public static function display_diagnostics_tab() {		$php_version = phpversion();
-		$php_status = 'Optimal';
-		$php_impact = 'No Impact';
-		$php_color = 'var(--si-success)';
-		if ( version_compare( $php_version, '7.4', '<' ) ) {
-			$php_status = 'Critical';
-			$php_impact = '-30% Penalty';
-			$php_color = 'var(--si-danger)';
-		} elseif ( version_compare( $php_version, '8.3', '<' ) ) {
-			$php_status = 'Warning';
-			$php_impact = '-10% Penalty';
-			$php_color = 'var(--si-warning)';
-		}
+	public static function display_diagnostics_tab() {
+		$php_version       = phpversion();
+		$php_version_state = self::get_php_version_status();
+		$php_status        = $php_version_state['label'];
+		$php_impact        = $php_version_state['penalty'] > 0 ? '-' . $php_version_state['penalty'] . '% Penalty' : 'No Impact';
+		$php_colors        = array(
+			'danger'  => 'var(--si-danger)',
+			'warning' => 'var(--si-warning)',
+			'success' => 'var(--si-success)',
+		);
+		$php_color         = isset( $php_colors[ $php_version_state['class'] ] ) ? $php_colors[ $php_version_state['class'] ] : 'var(--si-text-muted)';
 
 		$memory_limit = ini_get( 'memory_limit' );
 		$memory_limit_int = intval( $memory_limit );
@@ -2953,3 +3765,5 @@ class Server_Info {
 
 // Instantiate the Server_Info class
 $Server_Info = Server_Info::getInstance();
+
+register_activation_hook( __FILE__, array( 'Server_Info', 'on_activation' ) );
